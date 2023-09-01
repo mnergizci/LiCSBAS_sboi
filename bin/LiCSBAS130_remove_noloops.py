@@ -49,6 +49,7 @@ v1.0 20220929 Qi Ou, Uni of Leeds
 # - network/network13*.png : Figures of the network
 
 #%% Import
+from LiCSBAS_meta import *
 import getopt
 import os
 import sys

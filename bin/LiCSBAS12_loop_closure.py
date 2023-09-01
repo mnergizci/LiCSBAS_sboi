@@ -106,6 +106,7 @@ v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
 '''
 
 #%% Import
+from LiCSBAS_meta import *
 import getopt
 import os
 import sys
@@ -122,7 +123,6 @@ import LiCSBAS_inv_lib as inv_lib
 import LiCSBAS_plot_lib as plot_lib
 import xarray as xr
 import SCM
-from LiCSBAS_version import *
 
 class Usage(Exception):
     """Usage context manager"""

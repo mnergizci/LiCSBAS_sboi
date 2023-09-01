@@ -83,6 +83,7 @@ v1.0 20190731 Yu Morishita, Uni of Leeds and GSI
 
 print('Starting')
 #%% Import
+from LiCSBAS_meta import *
 import getopt
 import os
 import sys
@@ -97,7 +98,6 @@ import SCM
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_tools_lib as tools_lib
 import LiCSBAS_plot_lib as plot_lib
-from LiCSBAS_version import *
 
 class Usage(Exception):
     """Usage context manager"""

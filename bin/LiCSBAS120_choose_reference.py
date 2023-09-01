@@ -38,6 +38,7 @@ Usage
 =====
 LiCSBAS120_choose_reference.py [-h] [-f FRAME_DIR] [-g UNW_DIR] [-t TS_DIR] [-w WIN] [-r [0-1]] [--w_unw [0-1]] [--w_coh [0-1]] [--w_con [0-1]] [--w_hgt [0-1]] [--refx [0-1]] [--refy [0-1]]
 """
+from LiCSBAS_meta import *
 import numpy as np
 import matplotlib.pyplot as plt
 import os

@@ -42,6 +42,7 @@ v1.0 20190725 Yu Morishita, Uni of Leeds and GSI
 '''
 
 #%% Import
+from LiCSBAS_meta import *
 import getopt
 import os
 import sys
@@ -54,7 +55,6 @@ import LiCSBAS_io_lib as io_lib
 import LiCSBAS_inv_lib as inv_lib
 import LiCSBAS_tools_lib as tools_lib
 import LiCSBAS_plot_lib as plot_lib
-from LiCSBAS_version import *
 
 class Usage(Exception):
     """Usage context manager"""

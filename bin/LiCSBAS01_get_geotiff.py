@@ -75,6 +75,7 @@ v1.0 20190729 Yu Morishita, Uni of Leeds and GSI
 
 
 #%% Import
+from LiCSBAS_meta import *
 import getopt
 import os
 import re
@@ -86,7 +87,7 @@ import numpy as np
 import datetime as dt
 import multiprocessing as multi
 import LiCSBAS_tools_lib as tools_lib
-from LiCSBAS_version import *
+
 
 class Usage(Exception):
     """Usage context manager"""

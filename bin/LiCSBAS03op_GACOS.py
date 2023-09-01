@@ -78,6 +78,7 @@ v1.0 20190729 Yu Morishita, Uni of Leeds and GSI
 
 
 #%% Import
+from LiCSBAS_meta import *
 import getopt
 import os
 import sys

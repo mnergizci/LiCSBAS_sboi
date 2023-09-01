@@ -79,6 +79,7 @@ v1.0 20190724 Yu Morishita, Uni of Leeds and GSI
 '''
 
 #%% Import
+from LiCSBAS_meta import *
 import getopt
 import os
 os.environ['QT_QPA_PLATFORM']='offscreen'
@@ -88,7 +89,6 @@ import numpy as np
 import SCM
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_plot_lib as plot_lib
-from LiCSBAS_version import *
 
 import warnings
 import matplotlib
