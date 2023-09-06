@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """
-v1.8.1 20200911 Yu Morishita, GSI
 
 ========
 Overview
@@ -80,6 +79,7 @@ v1.0 20190724 Yu Morishita, Uni of Leeds and GSI
 '''
 
 #%% Import
+from LiCSBAS_meta import *
 import getopt
 import os
 os.environ['QT_QPA_PLATFORM']='offscreen'
@@ -122,7 +122,6 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.8.1"; date=20200911; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -355,7 +354,7 @@ def main(argv=None):
         if figsize_x < 6: figsize_x = 6
     else:
         figsize_x = 12
-        figsize_y = int((figsize_x)/4*3*length/width)
+        figsize_y = int(figsize_x/4*3*length/width)
         if figsize_y < 4: figsize_y = 4
     
     fig = plt.figure(figsize = (figsize_x, figsize_y))

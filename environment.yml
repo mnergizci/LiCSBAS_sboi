@@ -26,3 +26,5 @@ dependencies:
   - scikit-learn
   - dask
   - colorcet
+  - networkx
+  

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """
+v1.6.4 20230901 Lin Shen, COMET
 v1.6.3 20220330 Milan Lazecky, COMET
 v1.6.2 20211102 Milan Lazecky, COMET
 v1.6.1 20210405 Yu Morishita, GSI
@@ -55,7 +56,7 @@ Outputs in TS_GEOCml*/ :
 Usage
 =====
 LiCSBAS12_loop_closure.py -d ifgdir [-t tsadir] [-l loop_thre] [--multi_prime]
- [--rm_ifg_list file] [--n_para int] [--nullify] [--ref_approx lon/lat] [--skip_pngs]
+ [--rm_ifg_list file] [--n_para int] [--nullify] [--ref_approx lon/lat] [--skip_pngs] [--save_ori_unw]
 
  -d  Path to the GEOCml* dir containing stack of unw data.
  -t  Path to the output TS_GEOCml* dir. (Default: TS_GEOCml*)
@@ -66,9 +67,12 @@ LiCSBAS12_loop_closure.py -d ifgdir [-t tsadir] [-l loop_thre] [--multi_prime]
  --nullify Nullify unw values causing loop residuals >pi, per-pixel
  --ref_approx  Approximate geographic coordinates for reference area (lon/lat)
  --skip_pngs Do not generate png previews of loop closures (often takes long)
+ --save_ori_unw Save original ifgs before nullification for a later no-loop check
 """
-#%% Change log
+# %% Change log
 '''
+v1.6.4 20230901 Lin Shen
+ - Improved loop closure error check
 v1.6.3 20220330 Milan Lazecky
  - better choice of reference point - distance from centre (or given prelim ref point), and considering coherence
 v1.6.2 20211102 Milan Lazecky
@@ -102,7 +106,8 @@ v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
  - Original implementation
 '''
 
-#%% Import
+# %% Import
+from LiCSBAS_meta import *
 import getopt
 import os
 import sys
@@ -119,28 +124,31 @@ import LiCSBAS_inv_lib as inv_lib
 import LiCSBAS_plot_lib as plot_lib
 import xarray as xr
 
+
 class Usage(Exception):
     """Usage context manager"""
+
     def __init__(self, msg):
         self.msg = msg
 
 
-#%% Main
+# %% Main
 def main(argv=None):
-
-    #%% Check argv
+    # %% Check argv
     if argv == None:
         argv = sys.argv
 
     start = time.time()
-    ver="1.6.3"; date=20220330; author="M. Lazecky, Y. Morishita"
+    #ver = "1.6.4";
+    #date = 20230901;
+    #author = "Lin Shen, M. Lazecky, Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
     global Aloop, ifgdates, ifgdir, length, width, loop_pngdir, cycle, \
-        multi_prime, bad_ifg, noref_ifg, bad_ifg_all, refy1, refy2, refx1, refx2 ## for parallel processing
+        multi_prime, bad_ifg, noref_ifg, bad_ifg_all, refy1, refy2, refx1, refx2  ## for parallel processing
 
-    #%% Set default
+    # %% Set default
     ifgdir = []
     tsadir = []
     loop_thre = 1.5
@@ -149,24 +157,24 @@ def main(argv=None):
     nullify = False
     ref_approx = False
     do_pngs = True
+    save_ori_unw = False
 
     try:
         n_para = len(os.sched_getaffinity(0))
     except:
         n_para = multi.cpu_count()
 
-    cycle = 3 # 2pi*3/cycle
+    cycle = 3  # 2pi*3/cycle
     cmap_noise = 'viridis'
     cmap_noise_r = 'viridis_r'
     q = multi.get_context('fork')
 
-
-    #%% Read options
+    # %% Read options
     try:
         try:
             opts, args = getopt.getopt(argv[1:], "hd:t:l:",
                                        ["help", "multi_prime", "nullify", "skip_pngs",
-                                        "rm_ifg_list=", "n_para=", "ref_approx="])
+                                        "rm_ifg_list=", "n_para=", "ref_approx=", "save_ori_unw"])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -191,29 +199,30 @@ def main(argv=None):
                 do_pngs = False
             elif o == '--ref_approx':
                 ref_approx = a
+            elif o == '--save_ori_unw':
+                save_ori_unw = True
         if not ifgdir:
             raise Usage('No data directory given, -d is not optional!')
         elif not os.path.isdir(ifgdir):
             raise Usage('No {} dir exists!'.format(ifgdir))
         elif not os.path.exists(os.path.join(ifgdir, 'slc.mli.par')):
-                raise Usage('No slc.mli.par file exists in {}!'.format(ifgdir))
+            raise Usage('No slc.mli.par file exists in {}!'.format(ifgdir))
         if rm_ifg_list and not os.path.exists(rm_ifg_list):
             raise Usage('No {} exists!'.format(rm_ifg_list))
 
     except Usage as err:
         print("\nERROR:", file=sys.stderr, end='')
-        print("  "+str(err.msg), file=sys.stderr)
+        print("  " + str(err.msg), file=sys.stderr)
         print("\nFor help, use -h or --help.\n", file=sys.stderr)
         return 2
 
     print("\nloop_thre : {} rad".format(loop_thre), flush=True)
 
-
-    #%% Directory setting
+    # %% Directory setting
     ifgdir = os.path.abspath(ifgdir)
 
     if not tsadir:
-        tsadir = os.path.join(os.path.dirname(ifgdir), 'TS_'+os.path.basename(ifgdir))
+        tsadir = os.path.join(os.path.dirname(ifgdir), 'TS_' + os.path.basename(ifgdir))
 
     if not os.path.isdir(tsadir):
         print('\nNo {} exists!'.format(tsadir), file=sys.stderr)
@@ -224,20 +233,20 @@ def main(argv=None):
     loopdir = os.path.join(tsadir, '12loop')
     if not os.path.exists(loopdir): os.mkdir(loopdir)
 
-    loop_pngdir = os.path.join(loopdir ,'good_loop_png')
-    bad_loop_pngdir = os.path.join(loopdir,'bad_loop_png')
-    bad_loop_cand_pngdir = os.path.join(loopdir,'bad_loop_cand_png')
+    loop_pngdir = os.path.join(loopdir, 'good_loop_png')
+    bad_loop_pngdir = os.path.join(loopdir, 'bad_loop_png')
+    bad_loop_cand_pngdir = os.path.join(loopdir, 'bad_loop_cand_png')
 
     if do_pngs:
         if os.path.exists(loop_pngdir):
-            shutil.move(loop_pngdir+'/', loop_pngdir+'_old') #move to old dir
+            shutil.move(loop_pngdir + '/', loop_pngdir + '_old')  # move to old dir
         if os.path.exists(bad_loop_pngdir):
-            for png in glob.glob(bad_loop_pngdir+'/*.png'):
-                shutil.move(png, loop_pngdir+'_old') #move to old dir
+            for png in glob.glob(bad_loop_pngdir + '/*.png'):
+                shutil.move(png, loop_pngdir + '_old')  # move to old dir
             shutil.rmtree(bad_loop_pngdir)
         if os.path.exists(bad_loop_cand_pngdir):
-            for png in glob.glob(bad_loop_cand_pngdir+'/*.png'):
-                shutil.move(png, loop_pngdir+'_old') #move to old dir
+            for png in glob.glob(bad_loop_cand_pngdir + '/*.png'):
+                shutil.move(png, loop_pngdir + '_old')  # move to old dir
             shutil.rmtree(bad_loop_cand_pngdir)
 
         os.mkdir(loop_pngdir)
@@ -268,8 +277,7 @@ def main(argv=None):
 
     netdir = os.path.join(tsadir, 'network')
 
-
-    #%% Read date, network information and size
+    # %% Read date, network information and size
     ### Get dates
     ifgdates = tools_lib.get_ifgdates(ifgdir)
 
@@ -278,7 +286,7 @@ def main(argv=None):
     bad_ifg11 = io_lib.read_ifg_list(bad_ifg11file)
 
     ### Remove bad ifgs and images from list
-    ifgdates = list(set(ifgdates)-set(bad_ifg11))
+    ifgdates = list(set(ifgdates) - set(bad_ifg11))
     ifgdates.sort()
 
     imdates = tools_lib.ifgdates2imdates(ifgdates)
@@ -297,11 +305,10 @@ def main(argv=None):
 
     ### Extract no loop ifgs
     ns_loop4ifg = np.abs(Aloop).sum(axis=0)
-    ixs_ifg_no_loop = np.where(ns_loop4ifg==0)[0]
+    ixs_ifg_no_loop = np.where(ns_loop4ifg == 0)[0]
     no_loop_ifg = [ifgdates[ix] for ix in ixs_ifg_no_loop]
 
-
-    #%% 1st loop closure check. First without reference
+    # %% 1st loop closure check. First without reference
     _n_para = n_para if n_para < n_loop else n_loop
     print('\n1st Loop closure check and make png for all possible {} loops,'.format(n_loop), flush=True)
     print('with {} parallel processing...'.format(_n_para), flush=True)
@@ -309,11 +316,19 @@ def main(argv=None):
     bad_ifg_cand = []
     good_ifg = []
 
+    # replace .unw with .unw.ori OR REVERSE
+    if save_ori_unw:
+        print('Saving original ifg files')
+        for ifgd in ifgdates:
+            unwfile_ori = os.path.join(ifgdir, ifgd, ifgd + '.unw.ori')
+            unwfile = os.path.join(ifgdir, ifgd, ifgd + '.unw')
+            unw = io_lib.read_img(unwfile, length, width)
+            unw.tofile(unwfile_ori)
+
     ### Parallel processing
     p = q.Pool(_n_para)
     loop_ph_rms_ifg = np.array(p.map(loop_closure_1st_wrapper, range(n_loop)), dtype=np.float32)
     p.close()
-
 
     for i in range(n_loop):
         ### Find index of ifg
@@ -322,18 +337,17 @@ def main(argv=None):
         ifgd12 = ifgdates[ix_ifg12]
         ifgd23 = ifgdates[ix_ifg23]
         ifgd13 = ifgdates[ix_ifg13]
-        
+
         ### List as good or bad candidate
-        if loop_ph_rms_ifg[i] >= loop_thre: #Bad loop including bad ifg.
+        if loop_ph_rms_ifg[i] >= loop_thre:  # Bad loop including bad ifg.
             bad_ifg_cand.extend([ifgd12, ifgd23, ifgd13])
         else:
             good_ifg.extend([ifgd12, ifgd23, ifgd13])
 
-    if os.path.exists(loop_pngdir+'_old/'):
-        shutil.rmtree(loop_pngdir+'_old/')
+    if os.path.exists(loop_pngdir + '_old/'):
+        shutil.rmtree(loop_pngdir + '_old/')
 
-
-    #%% Identify bad ifgs and output text
+    # %% Identify bad ifgs and output text
     bad_ifg1 = loop_lib.identify_bad_ifg(bad_ifg_cand, good_ifg)
 
     bad_ifgfile = os.path.join(loopdir, 'bad_ifg_loop.txt')
@@ -344,7 +358,7 @@ def main(argv=None):
     ### Drop manually indicated ifg
     if rm_ifg_list:
         rm_ifg = io_lib.read_ifg_list(rm_ifg_list)
-        bad_ifg = list(set(bad_ifg1+rm_ifg))
+        bad_ifg = list(set(bad_ifg1 + rm_ifg))
 
         rm_ifgfile = os.path.join(loopdir, 'rm_ifg_man.txt')
         print("\nFollowing ifgs are manually removed by {}:".format(
@@ -363,16 +377,15 @@ def main(argv=None):
         if ifgd in bad_ifg:
             continue
 
-        unwfile = os.path.join(ifgdir, ifgd, ifgd+'.unw')
+        unwfile = os.path.join(ifgdir, ifgd, ifgd + '.unw')
         unw = io_lib.read_img(unwfile, length, width)
 
-        unw[unw == 0] = np.nan # Fill 0 with nan
-        n_unw += ~np.isnan(unw) # Summing number of unnan unw
+        unw[unw == 0] = np.nan  # Fill 0 with nan
+        n_unw += ~np.isnan(unw)  # Summing number of unnan unw
 
-
-    #%% 2nd loop closure check without bad ifgs to define stable ref area
+    # %% 2nd loop closure check without bad ifgs to define stable ref area
     ### Devide n_loop for paralell proc
-    _n_para2, args = tools_lib.get_patchrow(1, n_loop, 2**20/4, int(np.ceil(n_loop/n_para)))
+    _n_para2, args = tools_lib.get_patchrow(1, n_loop, 2 ** 20 / 4, int(np.ceil(n_loop / n_para)))
 
     print('\n2nd Loop closure check without bad ifgs to define ref area...', flush=True)
     print('with {} parallel processing...'.format(_n_para2), flush=True)
@@ -382,115 +395,117 @@ def main(argv=None):
     res = np.array(p.map(loop_closure_2nd_wrapper, args), dtype=np.float32)
     p.close()
 
-    ns_loop_ph = np.sum(res[:, 0, :, :,], axis=0)
-    ns_loop_ph[ns_loop_ph==0] = np.nan # To avoid 0 division
+    ns_loop_ph = np.sum(res[:, 0, :, :, ], axis=0)
+    ns_loop_ph[ns_loop_ph == 0] = np.nan  # To avoid 0 division
 
-    ns_bad_loop = np.sum(res[:, 1, :, :,], axis=0)
-    loop_ph_rms_points = np.sum(res[:, 2, :, :,], axis=0)
-    #loop_ph_rms_points = np.sqrt(loop_ph_rms_points/ns_loop_ph)
-    loop_ph_rms_points = np.sqrt(loop_ph_rms_points**2/ns_loop_ph)
-    
+    ns_bad_loop = np.sum(res[:, 1, :, :, ], axis=0)
+    loop_ph_rms_points = np.sum(res[:, 2, :, :, ], axis=0)
+    # loop_ph_rms_points = np.sqrt(loop_ph_rms_points/ns_loop_ph)
+    loop_ph_rms_points = np.sqrt(loop_ph_rms_points ** 2 / ns_loop_ph)
+
     ### Find stable ref area which have all n_unw and minimum ns_bad_loop and loop_ph_rms_points
-    mask1 = (n_unw==np.nanmax(n_unw))
+    mask1 = (n_unw == np.nanmax(n_unw))
     min_ns_bad_loop = np.nanmin(ns_bad_loop)
     while True:
-        mask2 = (ns_bad_loop==min_ns_bad_loop)
-        if np.all(~(mask1*mask2)): ## All masked
-            min_ns_bad_loop = min_ns_bad_loop+1 ## Make mask2 again
+        mask2 = (ns_bad_loop == min_ns_bad_loop)
+        if np.all(~(mask1 * mask2)):  ## All masked
+            min_ns_bad_loop = min_ns_bad_loop + 1  ## Make mask2 again
         else:
             break
-    loop_ph_rms_points_masked = loop_ph_rms_points*mask1*mask2
-    loop_ph_rms_points_masked[loop_ph_rms_points_masked==0] = np.nan
+    loop_ph_rms_points_masked = loop_ph_rms_points * mask1 * mask2
+    loop_ph_rms_points_masked[loop_ph_rms_points_masked == 0] = np.nan
     # ML 20220330 - adding here distance from centre of scene - or from given ref coordinates
     # this might be further updated for islands, using connected components
     if ref_approx:
         dempar = os.path.join(ifgdir, 'EQA.dem_par')
-        lat1 = float(io_lib.get_param_par(dempar, 'corner_lat')) # north
-        lon1 = float(io_lib.get_param_par(dempar, 'corner_lon')) # west
-        postlat = float(io_lib.get_param_par(dempar, 'post_lat')) # negative
-        postlon = float(io_lib.get_param_par(dempar, 'post_lon')) # positive
-        lat2 = lat1+postlat*(length-1) # south
-        lon2 = lon1+postlon*(width-1) # east
+        lat1 = float(io_lib.get_param_par(dempar, 'corner_lat'))  # north
+        lon1 = float(io_lib.get_param_par(dempar, 'corner_lon'))  # west
+        postlat = float(io_lib.get_param_par(dempar, 'post_lat'))  # negative
+        postlon = float(io_lib.get_param_par(dempar, 'post_lon'))  # positive
+        lat2 = lat1 + postlat * (length - 1)  # south
+        lon2 = lon1 + postlon * (width - 1)  # east
         try:
             if ref_approx.count('/') < 3:
-                range_geo_str=ref_approx.split('/')[0]+'/'+ref_approx.split('/')[0]+'/'+ref_approx.split('/')[1]+'/'+ref_approx.split('/')[1]
+                range_geo_str = ref_approx.split('/')[0] + '/' + ref_approx.split('/')[0] + '/' + ref_approx.split('/')[
+                    1] + '/' + ref_approx.split('/')[1]
             else:
-                range_geo_str=ref_approx
+                range_geo_str = ref_approx
             x1, x2, y1, y2 = tools_lib.read_range_geo(range_geo_str, width, length, lat1, postlat, lon1, postlon)
-            refnearyx = np.array([(y1+y2)/2, (x1+x2)/2]).astype(np.int16)
+            refnearyx = np.array([(y1 + y2) / 2, (x1 + x2) / 2]).astype(np.int16)
         except:
             print('error parsing lon/lat from ref coords - using centre of scene')
             refnearyx = np.array(loop_ph_rms_points_masked.shape)
-            refnearyx = np.round(refnearyx/2).astype(np.int16)
+            refnearyx = np.round(refnearyx / 2).astype(np.int16)
     else:
         refnearyx = np.array(loop_ph_rms_points_masked.shape)
-        refnearyx = np.round(refnearyx/2).astype(np.int16)
+        refnearyx = np.round(refnearyx / 2).astype(np.int16)
     # get pixels with low loop errors, i.e. within 20% percentile - or should we do lower?
     # 2022-10-12: instead of loop phase rms, choose pixel with highest coherence around given point
-    #realphrms = loop_ph_rms_points_masked
+    # realphrms = loop_ph_rms_points_masked
     # calculating avg_coh here already
     print('calculating average coherence (to be used also for ref point selection)')
     coh_avg = np.zeros((length, width), dtype=np.float32)
     n_coh = np.zeros((length, width), dtype=np.int16)
-    #n_unw = np.zeros((length, width), dtype=np.int16)
-    ifgdates_good = list(set(ifgdates)-set(bad_ifg))
+    # n_unw = np.zeros((length, width), dtype=np.int16)
+    ifgdates_good = list(set(ifgdates) - set(bad_ifg))
     for ifgd in ifgdates_good:
-        ccfile = os.path.join(ifgdir, ifgd, ifgd+'.cc')
-        if os.path.getsize(ccfile) == length*width:
+        ccfile = os.path.join(ifgdir, ifgd, ifgd + '.cc')
+        if os.path.getsize(ccfile) == length * width:
             coh = io_lib.read_img(ccfile, length, width, np.uint8)
-            coh = coh.astype(np.float32)/255
+            coh = coh.astype(np.float32) / 255
         else:
             coh = io_lib.read_img(ccfile, length, width)
-            coh[np.isnan(coh)] = 0 # Fill nan with 0
+            coh[np.isnan(coh)] = 0  # Fill nan with 0
 
         coh_avg += coh
-        n_coh += (coh!=0)
-        #unwfile = os.path.join(ifgdir, ifgd, ifgd+'.unw')
-        #unw = io_lib.read_img(unwfile, length, width)
-        #unw[unw == 0] = np.nan # Fill 0 with nan
-        #n_unw += ~np.isnan(unw) # Summing number of unnan unw
+        n_coh += (coh != 0)
+        # unwfile = os.path.join(ifgdir, ifgd, ifgd+'.unw')
+        # unw = io_lib.read_img(unwfile, length, width)
+        # unw[unw == 0] = np.nan # Fill 0 with nan
+        # n_unw += ~np.isnan(unw) # Summing number of unnan unw
 
-    coh_avg[n_coh==0] = np.nan
-    n_coh[n_coh==0] = 1 #to avoid zero division
-    coh_avg = coh_avg/n_coh
-    coh_avg[coh_avg==0] = np.nan
+    coh_avg[n_coh == 0] = np.nan
+    n_coh[n_coh == 0] = 1  # to avoid zero division
+    coh_avg = coh_avg / n_coh
+    coh_avg[coh_avg == 0] = np.nan
     #
     # for convenience (debug, to be checked if works ok), changing this to 1/coh
-    print('Oct 2022 update: selecting ref point based on avg coh (and all in unw) instead of loop phase closure min (as it depends on prelim ref area/mean of scene)')
-    coh_ratio_masked = (1/coh_avg)*mask1*mask2
-    coh_ratio_masked[coh_ratio_masked==0] = np.nan
+    print(
+        'Oct 2022 update: selecting ref point based on avg coh (and all in unw) instead of loop phase closure min (as it depends on prelim ref area/mean of scene)')
+    coh_ratio_masked = (1 / coh_avg) * mask1 * mask2
+    coh_ratio_masked[coh_ratio_masked == 0] = np.nan
     percentile = 20
-    percthres = np.nanpercentile(coh_ratio_masked,percentile)
-    refyxs = np.where(coh_ratio_masked<percthres)
+    percthres = np.nanpercentile(coh_ratio_masked, percentile)
+    refyxs = np.where(coh_ratio_masked < percthres)
     if len(refyxs[0]) < 10:
-        #decrease the limit
+        # decrease the limit
         percentile = 25
-        percthres = np.nanpercentile(coh_ratio_masked,percentile)
-        refyxs = np.where(coh_ratio_masked<percthres)
-    refyxs = refyxs[0]+refyxs[1]*1j  # work in complex plane
-    refnearyx = refnearyx[0]+refnearyx[1]*1j
-    distref = np.abs(refyxs-refnearyx)
+        percthres = np.nanpercentile(coh_ratio_masked, percentile)
+        refyxs = np.where(coh_ratio_masked < percthres)
+    refyxs = refyxs[0] + refyxs[1] * 1j  # work in complex plane
+    refnearyx = refnearyx[0] + refnearyx[1] * 1j
+    distref = np.abs(refyxs - refnearyx)
     # ok, let's directly weight with the loop err (this can be improved..)
-    weighted_dist = coh_ratio_masked[coh_ratio_masked<percthres]*distref
+    weighted_dist = coh_ratio_masked[coh_ratio_masked < percthres] * distref
     weighted_dist = weighted_dist.ravel()
     try:
         refpoint = np.nanargmin(weighted_dist)
         refy1 = int(np.real(refyxs[refpoint]))
         refx1 = int(np.imag(refyxs[refpoint]))
-        print('selected ref point is '+str(distref[refpoint])+' px from desired location')
+        print('selected ref point is ' + str(distref[refpoint]) + ' px from desired location')
     except:
-        #print('error - seems no proper points below '+str(percentile)+'% percentile of loop errors: '+str(percthres)+'. reverting to original licsbas approach')
-        #print('error - seems no proper points below '+str(percentile)+'% percentile of avg coh: '+str(percthres)+'. 
+        # print('error - seems no proper points below '+str(percentile)+'% percentile of loop errors: '+str(percthres)+'. reverting to original licsbas approach')
+        # print('error - seems no proper points below '+str(percentile)+'% percentile of avg coh: '+str(percthres)+'.
         print('error in updated refpoint selection approach. reverting to original licsbas approach')
-        #loop_ph_rms_points_masked = realphrms
-        refyx = np.where(loop_ph_rms_points_masked==np.nanmin(loop_ph_rms_points_masked))
-        refy1 = refyx[0][0] # start from 0, not 1
+        # loop_ph_rms_points_masked = realphrms
+        refyx = np.where(loop_ph_rms_points_masked == np.nanmin(loop_ph_rms_points_masked))
+        refy1 = refyx[0][0]  # start from 0, not 1
         refx1 = refyx[1][0]
-    
-    refy2 = refy1+1
-    refx2 = refx1+1
-    #loop_ph_rms_points_masked = realphrms
-    
+
+    refy2 = refy1 + 1
+    refx2 = refx1 + 1
+    # loop_ph_rms_points_masked = realphrms
+
     ### Save 12ref.txt
     reffile = os.path.join(infodir, '12ref.txt')
     with open(reffile, 'w') as f:
@@ -501,7 +516,7 @@ def main(argv=None):
     loop_ph_rms_points_masked.tofile(loop_ph_rms_maskedfile)
 
     cmax = np.nanpercentile(loop_ph_rms_points_masked, 95)
-    pngfile = loop_ph_rms_maskedfile+'.png'
+    pngfile = loop_ph_rms_maskedfile + '.png'
     title = 'RMS of loop phase (rad)'
     plot_lib.make_im_png(loop_ph_rms_points_masked, pngfile, cmap_noise_r, title, None, cmax)
 
@@ -511,10 +526,10 @@ def main(argv=None):
         if ifgd in bad_ifg:
             continue
 
-        unwfile = os.path.join(ifgdir, ifgd, ifgd+'.unw')
+        unwfile = os.path.join(ifgdir, ifgd, ifgd + '.unw')
         unw_ref = io_lib.read_img(unwfile, length, width)[refy1:refy2, refx1:refx2]
 
-        unw_ref[unw_ref == 0] = np.nan # Fill 0 with nan
+        unw_ref[unw_ref == 0] = np.nan  # Fill 0 with nan
         if np.all(np.isnan(unw_ref)):
             noref_ifg.append(ifgd)
 
@@ -523,8 +538,7 @@ def main(argv=None):
         for i in noref_ifg:
             print('{}'.format(i), file=f)
 
-
-    #%% 3rd loop closure check without bad ifgs wrt ref point
+    # %% 3rd loop closure check without bad ifgs wrt ref point
     print('\n3rd loop closure check taking into account ref phase...', flush=True)
     print('with {} parallel processing...'.format(_n_para), flush=True)
 
@@ -544,15 +558,14 @@ def main(argv=None):
         ifgd23 = ifgdates[ix_ifg23]
         ifgd13 = ifgdates[ix_ifg13]
 
-        if np.isnan(loop_ph_rms_ifg2[i]): # Skipped
-            loop_ph_rms_ifg2[i] = '--' ## Replace
-        elif loop_ph_rms_ifg2[i] >= loop_thre: #Bad loop including bad ifg.
+        if np.isnan(loop_ph_rms_ifg2[i]):  # Skipped
+            loop_ph_rms_ifg2[i] = '--'  ## Replace
+        elif loop_ph_rms_ifg2[i] >= loop_thre:  # Bad loop including bad ifg.
             bad_ifg_cand2.extend([ifgd12, ifgd23, ifgd13])
         else:
             good_ifg2.extend([ifgd12, ifgd23, ifgd13])
 
-
-    #%% Identify additional bad ifgs and output text
+    # %% Identify additional bad ifgs and output text
     bad_ifg2 = loop_lib.identify_bad_ifg(bad_ifg_cand2, good_ifg2)
 
     bad_ifgfile = os.path.join(loopdir, 'bad_ifg_loopref.txt')
@@ -560,13 +573,12 @@ def main(argv=None):
         for i in bad_ifg2:
             print('{}'.format(i), file=f)
 
-
-    #%% Output all bad ifg list and identify remaining candidate of bad ifgs
+    # %% Output all bad ifg list and identify remaining candidate of bad ifgs
     ### Merge bad ifg, bad_ifg2, noref_ifg
-    bad_ifg_all = list(set(bad_ifg+bad_ifg2+noref_ifg))  # Remove multiple
+    bad_ifg_all = list(set(bad_ifg + bad_ifg2 + noref_ifg))  # Remove multiple
     bad_ifg_all.sort()
 
-    ifgdates_good = list(set(ifgdates)-set(bad_ifg_all))
+    ifgdates_good = list(set(ifgdates) - set(bad_ifg_all))
     ifgdates_good.sort()
 
     bad_ifgfile = os.path.join(infodir, '12bad_ifg.txt')
@@ -576,7 +588,7 @@ def main(argv=None):
 
     ### Identify removed image and output file
     imdates_good = tools_lib.ifgdates2imdates(ifgdates_good)
-    imdates_bad = list(set(imdates)-set(imdates_good))
+    imdates_bad = list(set(imdates) - set(imdates_good))
     imdates_bad.sort()
 
     bad_imfile = os.path.join(infodir, '12removed_image.txt')
@@ -585,7 +597,7 @@ def main(argv=None):
             print('{}'.format(i), file=f)
 
     ### Remaining candidate of bad ifg
-    bad_ifg_cand_res = list(set(bad_ifg_cand2)-set(bad_ifg_all))
+    bad_ifg_cand_res = list(set(bad_ifg_cand2) - set(bad_ifg_all))
     bad_ifg_cand_res.sort()
 
     bad_ifg_candfile = os.path.join(infodir, '12bad_ifg_cand.txt')
@@ -593,38 +605,36 @@ def main(argv=None):
         for i in bad_ifg_cand_res:
             print('{}'.format(i), file=f)
 
-
-    #%% 4th loop to be used to calc n_loop_err and n_ifg_noloop
+    # %% 4th loop to be used to calc n_loop_err and n_ifg_noloop
     print('\n4th loop to compute statistics and remove pixels with loop errors...', flush=True)
     print('with {} parallel processing...'.format(_n_para2), flush=True)
 
-
     # create 3D cube - False means presumed error in the loop
-    a = np.full((length,width,len(ifgdates)), False) #, dtype=bool)
+    a = np.full((length, width, len(ifgdates)), False)  # , dtype=bool)
     da = xr.DataArray(
         data=a,
-        dims=[ "y", "x", "ifgd"],
-        coords=dict(y=np.arange(length),x=np.arange(width),ifgd=ifgdates))
+        dims=["y", "x", "ifgd"],
+        coords=dict(y=np.arange(length), x=np.arange(width), ifgd=ifgdates))
 
     ### Parallel processing
-    #p = q.Pool(_n_para2)
-    #p = q.Pool(1)  # 2021-11-02: updated nullifying unw pixels with loop phase - to avoid multiple write, no parallelism
-    #res = np.array(p.map(loop_closure_4th_wrapper, args), dtype=np.int16)
-    #p.close()
+    # p = q.Pool(_n_para2)
+    # p = q.Pool(1)  # 2021-11-02: updated nullifying unw pixels with loop phase - to avoid multiple write, no parallelism
+    # res = np.array(p.map(loop_closure_4th_wrapper, args), dtype=np.int16)
+    # p.close()
     # dataarray is not updated through parallel processing. avoiding parallelisation now
     ns_loop_err, da = loop_closure_4th([0, len(Aloop)], da)
-    #ns_loop_err = np.sum(res[:, :, :,], axis=0)
-
+    n_nullify = np.zeros((length, width), dtype=np.float32)
+    # ns_loop_err = np.sum(res[:, :, :,], axis=0)
     if nullify:
         print('nullifying unws with loop errors - not parallel now')
         for ifgd in ifgdates:
-            mask = da.loc[:,:,ifgd].values
+            mask = da.loc[:, :, ifgd].values
             # this will use only unws with mask having both True and False, i.e. all points False = unw not used in any loop, to check
             if not np.min(mask) and np.max(mask):
+                n_nullify = n_nullify + np.multiply(np.logical_not(np.array(mask)), 1)
                 nullify_unw(ifgd, mask)
         # recalculating ns_loop_err to be after nullification (long but... ok for now)
         ns_loop_err, da = loop_closure_4th([0, len(Aloop)], da)
-    
     # generate loop pngs:
     if do_pngs:
         ### Parallel processing
@@ -632,7 +642,7 @@ def main(argv=None):
         p.map(generate_pngs, range(n_loop))
         p.close()
 
-    #%% Output loop info, move bad_loop_png
+    # %% Output loop info, move bad_loop_png
     loop_info_file = os.path.join(loopdir, 'loop_info.txt')
     f = open(loop_info_file, 'w')
     print('# loop_thre: {} rad'.format(loop_thre), file=f)
@@ -685,41 +695,41 @@ def main(argv=None):
 
         if type(loop_ph_rms_ifg2[i]) == np.float32:
             str_loop_ph_rms_ifg2 = "{:.2f}".format(loop_ph_rms_ifg2[i])
-        else: ## --
+        else:  ## --
             str_loop_ph_rms_ifg2 = loop_ph_rms_ifg2[i]
 
-        print('{0} {1} {2}    {3:5.2f} {4}  {5:5s} {6}'.format(imd1, imd2, imd3, loop_ph_rms_ifg[i], badloopflag1, str_loop_ph_rms_ifg2, badloopflag2), file=f)
+        print('{0} {1} {2}    {3:5.2f} {4}  {5:5s} {6}'.format(imd1, imd2, imd3, loop_ph_rms_ifg[i], badloopflag1,
+                                                               str_loop_ph_rms_ifg2, badloopflag2), file=f)
 
     f.close()
 
-
-    #%% Saving coh_avg, n_unw, and n_loop_err only for good ifgs
+    # %% Saving coh_avg, n_unw, and n_loop_err only for good ifgs
     print('\nSaving coh_avg, n_unw, and n_loop_err...', flush=True)
     ### Calc coh avg and n_unw
     coh_avg = np.zeros((length, width), dtype=np.float32)
     n_coh = np.zeros((length, width), dtype=np.int16)
     n_unw = np.zeros((length, width), dtype=np.int16)
     for ifgd in ifgdates_good:
-        ccfile = os.path.join(ifgdir, ifgd, ifgd+'.cc')
-        if os.path.getsize(ccfile) == length*width:
+        ccfile = os.path.join(ifgdir, ifgd, ifgd + '.cc')
+        if os.path.getsize(ccfile) == length * width:
             coh = io_lib.read_img(ccfile, length, width, np.uint8)
-            coh = coh.astype(np.float32)/255
+            coh = coh.astype(np.float32) / 255
         else:
             coh = io_lib.read_img(ccfile, length, width)
-            coh[np.isnan(coh)] = 0 # Fill nan with 0
+            coh[np.isnan(coh)] = 0  # Fill nan with 0
 
         coh_avg += coh
-        n_coh += (coh!=0)
+        n_coh += (coh != 0)
 
-        unwfile = os.path.join(ifgdir, ifgd, ifgd+'.unw')
+        unwfile = os.path.join(ifgdir, ifgd, ifgd + '.unw')
         unw = io_lib.read_img(unwfile, length, width)
 
-        unw[unw == 0] = np.nan # Fill 0 with nan
-        n_unw += ~np.isnan(unw) # Summing number of unnan unw
+        unw[unw == 0] = np.nan  # Fill 0 with nan
+        n_unw += ~np.isnan(unw)  # Summing number of unnan unw
 
-    coh_avg[n_coh==0] = np.nan
-    n_coh[n_coh==0] = 1 #to avoid zero division
-    coh_avg = coh_avg/n_coh
+    coh_avg[n_coh == 0] = np.nan
+    n_coh[n_coh == 0] = 1  # to avoid zero division
+    coh_avg = coh_avg / n_coh
 
     ### Save files
     n_unwfile = os.path.join(resultsdir, 'n_unw')
@@ -731,30 +741,35 @@ def main(argv=None):
     n_loop_errfile = os.path.join(resultsdir, 'n_loop_err')
     np.float32(ns_loop_err).tofile(n_loop_errfile)
 
+    # if save_ori_unw:   #ML: saving always
+    n_nullify_file = os.path.join(resultsdir, 'n_nullify')
+    np.float32(n_nullify).tofile(n_nullify_file)
 
     ### Save png
     title = 'Average coherence'
-    plot_lib.make_im_png(coh_avg, coh_avgfile+'.png', cmap_noise, title)
+    plot_lib.make_im_png(coh_avg, coh_avgfile + '.png', cmap_noise, title)
     title = 'Number of used unw data'
-    plot_lib.make_im_png(n_unw, n_unwfile+'.png', cmap_noise, title, n_im)
+    plot_lib.make_im_png(n_unw, n_unwfile + '.png', cmap_noise, title, n_im)
 
     title = 'Number of unclosed loops'
-    plot_lib.make_im_png(ns_loop_err, n_loop_errfile+'.png', cmap_noise_r, title)
+    plot_lib.make_im_png(ns_loop_err, n_loop_errfile + '.png', cmap_noise_r, title)
 
+    # if save_ori_unw:
+    title = 'Number of nullified ifgs'
+    plot_lib.make_im_png(n_nullify, n_nullify_file + '.png', cmap_noise_r, title)
 
-    #%% Link ras
+    # %% Link ras
     ### First, identify suffix of raster image (ras, bmp, or png?)
-    unwfile = os.path.join(ifgdir, ifgdates[0], ifgdates[0]+'.unw')
-    if os.path.exists(unwfile+'.ras'):
+    unwfile = os.path.join(ifgdir, ifgdates[0], ifgdates[0] + '.unw')
+    if os.path.exists(unwfile + '.ras'):
         suffix = '.ras'
-    elif os.path.exists(unwfile+'.bmp'):
+    elif os.path.exists(unwfile + '.bmp'):
         suffix = '.bmp'
-    elif os.path.exists(unwfile+'.png'):
+    elif os.path.exists(unwfile + '.png'):
         suffix = '.png'
 
-
     for ifgd in ifgdates:
-        rasname = ifgd+'.unw'+suffix
+        rasname = ifgd + '.unw' + suffix
         rasorg = os.path.join(ifgdir, ifgd, rasname)
         ### Bad ifgs
         if ifgd in bad_ifg_all:
@@ -769,13 +784,12 @@ def main(argv=None):
         if ifgd in no_loop_ifg:
             os.symlink(os.path.relpath(rasorg, no_loop_ifgrasdir), os.path.join(no_loop_ifgrasdir, rasname))
 
-
-    #%% Plot network
+    # %% Plot network
     ## Read bperp data or dummy
     bperp_file = os.path.join(ifgdir, 'baselines')
     if os.path.exists(bperp_file):
         bperp = io_lib.read_bperp_file(bperp_file, imdates)
-    else: #dummy
+    else:  # dummy
         bperp = np.random.random(n_im).tolist()
 
     pngfile = os.path.join(netdir, 'network12_all.png')
@@ -790,36 +804,38 @@ def main(argv=None):
     ### Network info
     ## Identify gaps
     G = inv_lib.make_sb_matrix(ifgdates_good)
-    ixs_inc_gap = np.where(G.sum(axis=0)==0)[0]
+    ixs_inc_gap = np.where(G.sum(axis=0) == 0)[0]
 
     ## Connected network
     ix1 = 0
     connected_list = []
-    for ix2 in np.append(ixs_inc_gap, len(imdates_good)-1): #append for last image
+    for ix2 in np.append(ixs_inc_gap, len(imdates_good) - 1):  # append for last image
         imd1 = imdates_good[ix1]
         imd2 = imdates_good[ix2]
-        dyear = (dt.datetime.strptime(imd2, '%Y%m%d').toordinal() - dt.datetime.strptime(imd1, '%Y%m%d').toordinal())/365.25
-        n_im_connect = ix2-ix1+1
+        dyear = (dt.datetime.strptime(imd2, '%Y%m%d').toordinal() - dt.datetime.strptime(imd1,
+                                                                                         '%Y%m%d').toordinal()) / 365.25
+        n_im_connect = ix2 - ix1 + 1
         connected_list.append([imdates_good[ix1], imdates_good[ix2], dyear, n_im_connect])
-        ix1 = ix2+1 # Next connection
+        ix1 = ix2 + 1  # Next connection
 
-
-    #%% Caution about no_loop ifg, remaining large RMS loop and gap
+    # %% Caution about no_loop ifg, remaining large RMS loop and gap
     ### no_loop ifg
-    if len(no_loop_ifg)!=0:
+    if len(no_loop_ifg) != 0:
         no_loop_ifgfile = os.path.join(infodir, '12no_loop_ifg.txt')
         with open(no_loop_ifgfile, 'w') as f:
-            print("\nThere are {} ifgs without loop, recommend to check manually in no_loop_ifg_ras12".format(len(no_loop_ifg)), flush=True)
+            print("\nThere are {} ifgs without loop, recommend to check manually in no_loop_ifg_ras12".format(
+                len(no_loop_ifg)), flush=True)
             for ifgd in no_loop_ifg:
                 print('{}'.format(ifgd), flush=True)
                 print('{}'.format(ifgd), file=f)
 
     ### Remaining candidates of bad ifgs
-    if len(bad_ifg_cand_res)!=0:
-        print("\nThere are {} remaining candidates of bad ifgs but not identified.".format(len(bad_ifg_cand_res)), flush=True)
+    if len(bad_ifg_cand_res) != 0:
+        print("\nThere are {} remaining candidates of bad ifgs but not identified.".format(len(bad_ifg_cand_res)),
+              flush=True)
         print("Check 12bad_ifg_cand_ras and loop/bad_loop_cand_png.", flush=True)
-#        for ifgd in bad_ifg_cand_res:
-#            print('{}'.format(ifgd))
+    #        for ifgd in bad_ifg_cand_res:
+    #            print('{}'.format(ifgd))
 
     print('\n{0}/{1} ifgs are discarded from further processing.'.format(len(bad_ifg_all), n_ifg), flush=True)
     for ifgd in bad_ifg_all:
@@ -828,12 +844,12 @@ def main(argv=None):
     ### Gap
     gap_infofile = os.path.join(infodir, '12network_gap_info.txt')
     with open(gap_infofile, 'w') as f:
-        if ixs_inc_gap.size!=0:
+        if ixs_inc_gap.size != 0:
             print("Gaps between:", file=f)
             print("\nGaps in network between:", flush=True)
             for ix in ixs_inc_gap:
-                print("{} {}".format(imdates_good[ix], imdates_good[ix+1]), file=f)
-                print("{} {}".format(imdates_good[ix], imdates_good[ix+1]), flush=True)
+                print("{} {}".format(imdates_good[ix], imdates_good[ix + 1]), file=f)
+                print("{} {}".format(imdates_good[ix], imdates_good[ix + 1]), flush=True)
 
         print("\nConnected network (year, n_image):", file=f)
         print("\nConnected network (year, n_image):", flush=True)
@@ -841,15 +857,15 @@ def main(argv=None):
             print("{0}-{1} ({2:.2f}, {3})".format(list1[0], list1[1], list1[2], list1[3]), file=f)
             print("{0}-{1} ({2:.2f}, {3})".format(list1[0], list1[1], list1[2], list1[3]), flush=True)
 
-    print('\nIf you want to change the bad ifgs to be discarded, re-run with different thresholds before next step.', flush=True)
+    print('\nIf you want to change the bad ifgs to be discarded, re-run with different thresholds before next step.',
+          flush=True)
 
-
-    #%% Finish
-    elapsed_time = time.time()-start
-    hour = int(elapsed_time/3600)
-    minite = int(np.mod((elapsed_time/60),60))
-    sec = int(np.mod(elapsed_time,60))
-    print("\nElapsed time: {0:02}h {1:02}m {2:02}s".format(hour,minite,sec))
+    # %% Finish
+    elapsed_time = time.time() - start
+    hour = int(elapsed_time / 3600)
+    minite = int(np.mod((elapsed_time / 60), 60))
+    sec = int(np.mod(elapsed_time, 60))
+    print("\nElapsed time: {0:02}h {1:02}m {2:02}s".format(hour, minite, sec))
 
     print('\n{} Successfully finished!!\n'.format(os.path.basename(argv[0])))
     print('Output directory: {}\n'.format(os.path.relpath(tsadir)))
@@ -859,7 +875,8 @@ def generate_pngs(i):
     n_loop = Aloop.shape[0]
 
     ### Read unw
-    unw12, unw23, unw13, ifgd12, ifgd23, ifgd13 = loop_lib.read_unw_loop_ph(Aloop[i, :], ifgdates, ifgdir, length, width)
+    unw12, unw23, unw13, ifgd12, ifgd23, ifgd13 = loop_lib.read_unw_loop_ph(Aloop[i, :], ifgdates, ifgdir, length,
+                                                                            width)
 
     ### Skip if bad ifg is included
     if ifgd12 in bad_ifg or ifgd23 in bad_ifg or ifgd13 in bad_ifg:
@@ -875,28 +892,28 @@ def generate_pngs(i):
     ref_unw13 = np.nanmean(unw13[refy1:refy2, refx1:refx2])
 
     ## Calculate loop phase taking into account ref phase
-    loop_ph = unw12+unw23-unw13-(ref_unw12+ref_unw23-ref_unw13)
+    loop_ph = unw12 + unw23 - unw13 - (ref_unw12 + ref_unw23 - ref_unw13)
 
     # getting some average information
     if np.all(np.isnan(loop_ph)):
         bias = np.nan
         rms = np.inf
     else:
-        loop_2pin = np.round(np.nanmedian(loop_ph)/(2*np.pi))*2*np.pi
-        loop_ph = loop_ph-loop_2pin #unbias 2pi x n
+        loop_2pin = np.round(np.nanmedian(loop_ph) / (2 * np.pi)) * 2 * np.pi
+        loop_ph = loop_ph - loop_2pin  # unbias 2pi x n
 
         if multi_prime:
             bias = np.nanmedian(loop_ph)
-            loop_ph = loop_ph - bias # unbias inconsistent fraction phase
+            loop_ph = loop_ph - bias  # unbias inconsistent fraction phase
 
-        rms = np.sqrt(np.nanmean(loop_ph**2))
+        rms = np.sqrt(np.nanmean(loop_ph ** 2))
 
     ### Output png. If exist in old, move to save time
     imd1 = ifgd12[:8]
     imd2 = ifgd23[:8]
     imd3 = ifgd23[-8:]
-    png = os.path.join(loop_pngdir, imd1+'_'+imd2+'_'+imd3+'_loop.png')
-    oldpng = os.path.join(loop_pngdir+'_old/', imd1+'_'+imd2+'_'+imd3+'_loop.png')
+    png = os.path.join(loop_pngdir, imd1 + '_' + imd2 + '_' + imd3 + '_loop.png')
+    oldpng = os.path.join(loop_pngdir + '_old/', imd1 + '_' + imd2 + '_' + imd3 + '_loop.png')
     if os.path.exists(oldpng):
         ### Just move from old png
         shutil.move(oldpng, loop_pngdir)
@@ -904,7 +921,7 @@ def generate_pngs(i):
         ### Make png. Take time a little.
         titles4 = ['{} ({}*2pi/cycle)'.format(ifgd12, cycle),
                    '{} ({}*2pi/cycle)'.format(ifgd23, cycle),
-                   '{} ({}*2pi/cycle)'.format(ifgd13, cycle),]
+                   '{} ({}*2pi/cycle)'.format(ifgd13, cycle), ]
         if multi_prime:
             titles4.append('Loop (STD={:.2f}rad, bias={:.2f}rad)'.format(rms, bias))
         else:
@@ -913,7 +930,7 @@ def generate_pngs(i):
         loop_lib.make_loop_png(unw12, unw23, unw13, loop_ph, png, titles4, cycle)
 
 
-#%%
+# %%
 def loop_closure_1st_wrapper(i):
     '''
     ML:
@@ -927,23 +944,24 @@ def loop_closure_1st_wrapper(i):
     if np.mod(i, 100) == 0:
         print("  {0:3}/{1:3}th loop...".format(i, n_loop), flush=True)
 
-    unw12, unw23, unw13, ifgd12, ifgd23, ifgd13 = loop_lib.read_unw_loop_ph(Aloop[i, :], ifgdates, ifgdir, length, width)
+    unw12, unw23, unw13, ifgd12, ifgd23, ifgd13 = loop_lib.read_unw_loop_ph(Aloop[i, :], ifgdates, ifgdir, length,
+                                                                            width)
 
     ## Calculate loop phase and check n bias (2pi*n)
-    loop_ph = unw12+unw23-unw13
+    loop_ph = unw12 + unw23 - unw13
 
     if np.all(np.isnan(loop_ph)):
         bias = np.nan
         rms = np.inf
     else:
-        loop_2pin = np.round(np.nanmedian(loop_ph)/(2*np.pi))*2*np.pi
-        loop_ph = loop_ph-loop_2pin #unbias 2pi x n
+        loop_2pin = np.round(np.nanmedian(loop_ph) / (2 * np.pi)) * 2 * np.pi
+        loop_ph = loop_ph - loop_2pin  # unbias 2pi x n
 
         if multi_prime:
             bias = np.nanmedian(loop_ph)
-            loop_ph = loop_ph - bias # unbias inconsistent fraction phase
+            loop_ph = loop_ph - bias  # unbias inconsistent fraction phase
 
-        rms = np.sqrt(np.nanmean(loop_ph**2))
+        rms = np.sqrt(np.nanmean(loop_ph ** 2))
 
     '''
     # moved to the last stage, i.e. after multi-prime and nullify corrections
@@ -972,7 +990,7 @@ def loop_closure_1st_wrapper(i):
     return rms
 
 
-#%%
+# %%
 def loop_closure_2nd_wrapper(args):
     '''
     ML:
@@ -992,37 +1010,38 @@ def loop_closure_2nd_wrapper(args):
             print("  {0:3}/{1:3}th loop...".format(i, n_loop), flush=True)
 
         ### Read unw
-        unw12, unw23, unw13, ifgd12, ifgd23, ifgd13 = loop_lib.read_unw_loop_ph(Aloop[i, :], ifgdates, ifgdir, length, width)
+        unw12, unw23, unw13, ifgd12, ifgd23, ifgd13 = loop_lib.read_unw_loop_ph(Aloop[i, :], ifgdates, ifgdir, length,
+                                                                                width)
 
         ### Skip if bad ifg is included
         if ifgd12 in bad_ifg or ifgd23 in bad_ifg or ifgd13 in bad_ifg:
             continue
 
         ## Calculate loop phase and rms at points
-        loop_ph = unw12+unw23-unw13
+        loop_ph = unw12 + unw23 - unw13
 
         if not np.all(np.isnan(loop_ph)):
-            loop_2pin = np.round(np.nanmedian(loop_ph)/(2*np.pi))*2*np.pi
-            loop_ph = loop_ph-loop_2pin #unbias 2pi x n
+            loop_2pin = np.round(np.nanmedian(loop_ph) / (2 * np.pi)) * 2 * np.pi
+            loop_ph = loop_ph - loop_2pin  # unbias 2pi x n
 
             if multi_prime:
                 bias = np.nanmedian(loop_ph)
-                loop_ph = loop_ph - bias # unbias inconsistent fraction phase
+                loop_ph = loop_ph - bias  # unbias inconsistent fraction phase
 
         ns_loop_ph1 = ns_loop_ph1 + ~np.isnan(loop_ph)
 
-        loop_ph_sq = loop_ph**2
+        loop_ph_sq = loop_ph ** 2
         loop_ph_sq[np.isnan(loop_ph_sq)] = 0
         loop_ph_rms_points1 = loop_ph_rms_points1 + loop_ph_sq
 
-        ns_bad_loop1 = ns_bad_loop1+(loop_ph_sq>np.pi**2) #suspected unw error
-#        ns_bad_loop = ns_bad_loop+(np.abs(loop_ph)>loop_thre)
-        ## multiple nan seem to generate RuntimeWarning
+        ns_bad_loop1 = ns_bad_loop1 + (loop_ph_sq > np.pi ** 2)  # suspected unw error
+    #        ns_bad_loop = ns_bad_loop+(np.abs(loop_ph)>loop_thre)
+    ## multiple nan seem to generate RuntimeWarning
 
     return ns_loop_ph1, ns_bad_loop1, loop_ph_rms_points1
 
 
-#%%
+# %%
 def loop_closure_3rd_wrapper(i):
     '''
     ML
@@ -1034,7 +1053,8 @@ def loop_closure_3rd_wrapper(i):
         print("  {0:3}/{1:3}th loop...".format(i, n_loop), flush=True)
 
     ### Read unw
-    unw12, unw23, unw13, ifgd12, ifgd23, ifgd13 = loop_lib.read_unw_loop_ph(Aloop[i, :], ifgdates, ifgdir, length, width)
+    unw12, unw23, unw13, ifgd12, ifgd23, ifgd13 = loop_lib.read_unw_loop_ph(Aloop[i, :], ifgdates, ifgdir, length,
+                                                                            width)
 
     ### Skip if bad ifg is included
     if ifgd12 in bad_ifg or ifgd23 in bad_ifg or ifgd13 in bad_ifg:
@@ -1050,11 +1070,11 @@ def loop_closure_3rd_wrapper(i):
     ref_unw13 = np.nanmean(unw13[refy1:refy2, refx1:refx2])
 
     ## Calculate loop phase taking into account ref phase
-    loop_ph = unw12+unw23-unw13-(ref_unw12+ref_unw23-ref_unw13)
-    return np.sqrt(np.nanmean((loop_ph)**2))
+    loop_ph = unw12 + unw23 - unw13 - (ref_unw12 + ref_unw23 - ref_unw13)
+    return np.sqrt(np.nanmean((loop_ph) ** 2))
 
 
-#%%
+# %%
 def loop_closure_4th_wrapper(args):
     '''
     ML:
@@ -1067,68 +1087,121 @@ def loop_closure_4th_wrapper(args):
         if np.mod(i, 100) == 0:
             print("  {0:3}/{1:3}th loop...".format(i, n_loop), flush=True)
         ### Read unw
-        unw12, unw23, unw13, ifgd12, ifgd23, ifgd13 = loop_lib.read_unw_loop_ph(Aloop[i, :], ifgdates, ifgdir, length, width)
+        unw12, unw23, unw13, ifgd12, ifgd23, ifgd13 = loop_lib.read_unw_loop_ph(Aloop[i, :], ifgdates, ifgdir, length,
+                                                                                width)
         ### Skip if bad ifg is included
         if ifgd12 in bad_ifg_all or ifgd23 in bad_ifg_all or ifgd13 in bad_ifg_all:
-            #print('skipping '+ifgd13)
+            # print('skipping '+ifgd13)
             continue
         ## Compute ref
         ref_unw12 = np.nanmean(unw12[refy1:refy2, refx1:refx2])
         ref_unw23 = np.nanmean(unw23[refy1:refy2, refx1:refx2])
         ref_unw13 = np.nanmean(unw13[refy1:refy2, refx1:refx2])
         ## Calculate loop phase taking into account ref phase
-        loop_ph = unw12+unw23-unw13-(ref_unw12+ref_unw23-ref_unw13)
+        loop_ph = unw12 + unw23 - unw13 - (ref_unw12 + ref_unw23 - ref_unw13)
         ## Count number of loops with suspected unwrap error (>pi)
-        loop_ph[np.isnan(loop_ph)] = 0 #to avoid warning
-        is_error = np.abs(loop_ph)>np.pi
-        #da.loc[:,:,ifgd12] = da.loc[:,:,ifgd12]+is_error
-        #da.loc[:,:,ifgd23] = da.loc[:,:,ifgd23]+is_error
-        #da.loc[:,:,ifgd13] = da.loc[:,:,ifgd13]+is_error
-        ns_loop_err1 = ns_loop_err1+is_error #suspected unw error
+        loop_ph[np.isnan(loop_ph)] = 0  # to avoid warning
+        is_error = np.abs(loop_ph) > np.pi
+        # da.loc[:,:,ifgd12] = da.loc[:,:,ifgd12]+is_error
+        # da.loc[:,:,ifgd23] = da.loc[:,:,ifgd23]+is_error
+        # da.loc[:,:,ifgd13] = da.loc[:,:,ifgd13]+is_error
+        ns_loop_err1 = ns_loop_err1 + is_error  # suspected unw error
     return ns_loop_err1
 
 
 # for now, without parallelism
 def loop_closure_4th(args, da):
-    nullify_threshold=np.pi
+    nullify_threshold = np.pi
     i0, i1 = args
     n_loop = Aloop.shape[0]
     ns_loop_err1 = np.zeros((length, width), dtype=np.int16)
+    A = np.zeros((length, width, len(ifgdates)), dtype=np.float32)
+    B = np.zeros((length, width, len(ifgdates)), dtype=np.float32)
+    ns_loop_all = xr.DataArray(
+        data=A,
+        dims=["y", "x", "ifgd"],
+        coords=dict(y=np.arange(length), x=np.arange(width), ifgd=ifgdates))
+
+    ns_loop_bad = xr.DataArray(
+        data=B,
+        dims=["y", "x", "ifgd"],
+        coords=dict(y=np.arange(length), x=np.arange(width), ifgd=ifgdates))
+    one_array = np.ones((length, width), dtype=np.float32)
     for i in range(i0, i1):
         if np.mod(i, 100) == 0:
             print("  {0:3}/{1:3}th loop...".format(i, n_loop), flush=True)
         ### Read unw
-        unw12, unw23, unw13, ifgd12, ifgd23, ifgd13 = loop_lib.read_unw_loop_ph(Aloop[i, :], ifgdates, ifgdir, length, width)
+        unw12, unw23, unw13, ifgd12, ifgd23, ifgd13 = loop_lib.read_unw_loop_ph(Aloop[i, :], ifgdates, ifgdir, length,
+                                                                                width)
+
         ### Skip if bad ifg is included
         if ifgd12 in bad_ifg_all or ifgd23 in bad_ifg_all or ifgd13 in bad_ifg_all:
-            #print('skipping '+ifgd13)
+            # print('skipping '+ifgd13)
             continue
         ## Compute ref
         ref_unw12 = np.nanmean(unw12[refy1:refy2, refx1:refx2])
         ref_unw23 = np.nanmean(unw23[refy1:refy2, refx1:refx2])
         ref_unw13 = np.nanmean(unw13[refy1:refy2, refx1:refx2])
         ## Calculate loop phase taking into account ref phase
-        loop_ph = unw12+unw23-unw13-(ref_unw12+ref_unw23-ref_unw13)
+        loop_ph = unw12 + unw23 - unw13 - (ref_unw12 + ref_unw23 - ref_unw13)
+        one_array_loop = one_array
+        one_array_loop[np.isnan(loop_ph)] = 0
+        ns_loop_all.loc[:, :, ifgd12] = ns_loop_all.loc[:, :, ifgd12] + one_array_loop
+        ns_loop_all.loc[:, :, ifgd23] = ns_loop_all.loc[:, :, ifgd23] + one_array_loop
+        ns_loop_all.loc[:, :, ifgd13] = ns_loop_all.loc[:, :, ifgd13] + one_array_loop
         ## Count number of loops with suspected unwrap error (>pi)
-        loop_ph[np.isnan(loop_ph)] = 0 #to avoid warning
-        is_ok = np.abs(loop_ph)<nullify_threshold
-        da.loc[:,:,ifgd12] = np.logical_or(da.loc[:,:,ifgd12],is_ok)
-        da.loc[:,:,ifgd23] = np.logical_or(da.loc[:,:,ifgd23],is_ok)
-        da.loc[:,:,ifgd13] = np.logical_or(da.loc[:,:,ifgd13],is_ok)
-        ns_loop_err1 = ns_loop_err1 + ~is_ok #suspected unw error
+        loop_ph[np.isnan(loop_ph)] = 0  # to avoid warning
+        is_ok = np.abs(loop_ph) < nullify_threshold
+        da.loc[:, :, ifgd12] = np.logical_or(da.loc[:, :, ifgd12], is_ok)
+        da.loc[:, :, ifgd23] = np.logical_or(da.loc[:, :, ifgd23], is_ok)
+        da.loc[:, :, ifgd13] = np.logical_or(da.loc[:, :, ifgd13], is_ok)
+        ns_loop_err1 = ns_loop_err1 + ~is_ok  # suspected unw error
+        ns_loop_bad.loc[:, :, ifgd12] = ns_loop_bad.loc[:, :, ifgd12] + ~is_ok
+        ns_loop_bad.loc[:, :, ifgd23] = ns_loop_bad.loc[:, :, ifgd23] + ~is_ok
+        ns_loop_bad.loc[:, :, ifgd13] = ns_loop_bad.loc[:, :, ifgd13] + ~is_ok
     ns_loop_err1 = np.array(ns_loop_err1, dtype=np.int16)
+    for i in range(i0, i1):
+        if np.mod(i, 100) == 0:
+            print("  {0:3}/{1:3}th loop...".format(i, n_loop), flush=True)
+        ### Read unw
+        unw12, unw23, unw13, ifgd12, ifgd23, ifgd13 = loop_lib.read_unw_loop_ph(Aloop[i, :], ifgdates, ifgdir, length,
+                                                                                width)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            ratio1 = np.divide(np.array(ns_loop_bad.loc[:, :, ifgd12], dtype=np.float32),
+                               np.array(ns_loop_all.loc[:, :, ifgd12], np.float32))
+        with np.errstate(divide='ignore', invalid='ignore'):
+            ratio2 = np.divide(np.array(ns_loop_bad.loc[:, :, ifgd23], dtype=np.float32),
+                               np.array(ns_loop_all.loc[:, :, ifgd23], np.float32))
+        with np.errstate(divide='ignore', invalid='ignore'):
+            ratio3 = np.divide(np.array(ns_loop_bad.loc[:, :, ifgd13], dtype=np.float32),
+                               np.array(ns_loop_all.loc[:, :, ifgd13], np.float32))
+        ratio1[np.isnan(ratio1)] = 0
+        ratio2[np.isnan(ratio2)] = 0
+        ratio3[np.isnan(ratio3)] = 0
+        # ratio1[ratio1<0.1]=0
+        # ratio2[ratio2<0.1]=0
+        # ratio3[ratio3<0.1]=0
+        ratio = np.stack((ratio1, ratio2, ratio3))
+        n_index = np.nanargmax(ratio, axis=0)
+        max_is_zero = np.nanmax(ratio, axis=0) == 0
+        n_index1 = np.logical_and(n_index == 0, ~max_is_zero)
+        da.loc[:, :, ifgd12] = np.logical_and(da.loc[:, :, ifgd12], ~n_index1)
+        n_index2 = np.logical_and(n_index == 1, ~max_is_zero)
+        da.loc[:, :, ifgd23] = np.logical_and(da.loc[:, :, ifgd23], ~n_index2)
+        n_index3 = np.logical_and(n_index == 2, ~max_is_zero)
+        da.loc[:, :, ifgd13] = np.logical_and(da.loc[:, :, ifgd13], ~n_index3)
     return ns_loop_err1, da
 
 
 def nullify_unw(ifgd, mask):
-    unwfile = os.path.join(ifgdir, ifgd, ifgd+'.unw')
+    unwfile = os.path.join(ifgdir, ifgd, ifgd + '.unw')
     if os.path.exists(unwfile):
         unw = io_lib.read_img(unwfile, length, width)
-        #unw[mask==False]=0  # should be ok but it appears as 0 in preview...
+        # unw[mask==False]=0  # should be ok but it appears as 0 in preview...
         unw[mask == False] = np.nan
         unw.tofile(unwfile)
 
 
-#%% main
+# %% main
 if __name__ == "__main__":
     sys.exit(main())

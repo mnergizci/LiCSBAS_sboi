@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """
-v1.5.3 20230602 Yu Morishita, GSI, M. Lazecky and Pedro E. Bedon, Uni of Leeds
 
 This script applies spatio-temporal filter (HP in time and LP in space with gaussian kernel, same as StaMPS) to the time series of displacement. Deramping (1D, bilinear, or 2D polynomial) can also be applied if -r option is used. Topography-correlated components (linear with elevation) can also be subtracted with --hgt_linear option simultaneously with deramping before spatio-temporal filtering. The impact of filtering (deramp and linear elevation as well) can be visually checked by showing 16filt*/*png. A stable reference point is determined after the filtering as well as Step 1-3.
 
@@ -111,6 +110,7 @@ v1.0 20190731 Yu Morishita, Uni of Leeds and GSI
 '''
 
 #%% Import
+from LiCSBAS_meta import *
 import getopt
 import os
 os.environ['QT_QPA_PLATFORM']='offscreen'
@@ -143,7 +143,6 @@ def main(argv=None):
         argv = sys.argv
 
     start = time.time()
-    ver="1.5.1"; date=20210311; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -428,7 +427,7 @@ def main(argv=None):
 
 
     #%% First, deramp and hgt-linear if indicated
-    cum = np.zeros((cum_org.shape), dtype=np.float32)*np.nan
+    cum = np.zeros(cum_org.shape, dtype=np.float32)*np.nan
     if not deg_ramp and not hgt_linearflag:
         cum = cum_org
         del cum_org
@@ -548,8 +547,8 @@ def main(argv=None):
     bool_unnan = ~np.isnan(cum_filt[0, :, :]).reshape(length, width) ## not all nan
     cum_pt = cum_filt.reshape(n_im, length*width)[:, bool_unnan.ravel()] #n_im x n_pt
     n_pt_unnan = bool_unnan.sum()
-    vconst_tmp = np.zeros((n_pt_unnan), dtype=np.float32)*np.nan
-    vel_tmp = np.zeros((n_pt_unnan), dtype=np.float32)*np.nan
+    vconst_tmp = np.zeros(n_pt_unnan, dtype=np.float32)*np.nan
+    vel_tmp = np.zeros(n_pt_unnan, dtype=np.float32)*np.nan
 
     bool_nonan_pt = np.all(~np.isnan(cum_pt), axis=0)
 
@@ -755,7 +754,7 @@ def filter_wrapper(i):
             warnings.simplefilter('ignore', RuntimeWarning)
             weight_factor = weight_factor/np.sum(weight_factor, axis=0)
 
-        cum_lpt = np.nansum(cum[ixs, :, :]*weight_factor, axis=0);
+        cum_lpt = np.nansum(cum[ixs, :, :]*weight_factor, axis=0)
 
         cum_hpt = cum[i, :, :] - cum_lpt
 

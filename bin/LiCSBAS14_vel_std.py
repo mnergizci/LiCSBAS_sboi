@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 """
-v1.3 20221115 Milan Lazecky, Uni of Leeds
-v1.2 20210309 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
@@ -44,6 +42,7 @@ v1.0 20190725 Yu Morishita, Uni of Leeds and GSI
 '''
 
 #%% Import
+from LiCSBAS_meta import *
 import getopt
 import os
 import sys
@@ -71,8 +70,6 @@ def main(argv=None):
         argv = sys.argv
 
     start = time.time()
-    #ver=1.2; date=20210309; author="Y. Morishita"
-    ver=1.3; date=20221115; author="M. Lazecky"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 

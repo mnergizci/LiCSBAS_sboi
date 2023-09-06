@@ -49,14 +49,14 @@ v1.4 20221011 Qi Ou, Uni of Leeds
  - Shortlist by slope > 30, R2 > 0.95, then expand based on repeated epochs in the shortlist, threshold with slopd > 20
 v1.3.4 20211129 Milan Lazecky, Uni of Leeds
  - Extra check on file dimensions - happens if LiCSAR data is inconsistent - should be moved to previous step
-v1.3.3 20210402 Yu Morioshita, GSI
+v1.3.3 20210402 Yu Morishita, GSI
  - Treat all nan as bad ifg
  - Raise error if all ifgs are bad
-v1.3.2 20201116 Yu Morioshita, GSI
+v1.3.2 20201116 Yu Morishita, GSI
  - Exit if suffix is not set
-v1.3.1 20200911 Yu Morioshita, GSI
+v1.3.1 20200911 Yu Morishita, GSI
  - Change default to -c 0.05 -u 0.3
-v1.3 20200703 Yu Morioshita, GSI
+v1.3 20200703 Yu Morishita, GSI
  - Replace problematic terms
 v1.2 20200225 Yu Morishita, Uni of Leeds and GSI
  - Not output network pdf
@@ -68,6 +68,7 @@ v1.0 20190729 Yu Morishita, Uni of Leeds and GSI
 '''
 
 #%% Import
+from LiCSBAS_meta import *
 import getopt
 import os
 import sys
@@ -94,7 +95,6 @@ def main(argv=None):
         argv = sys.argv
 
     start = time.time()
-    ver="1.4"; date=20221020; author="Qi Ou"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 

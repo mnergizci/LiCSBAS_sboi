@@ -53,6 +53,9 @@ def make_geotiff(data, latn_p, lonw_p, dlat, dlon, outfile, compress_option, nod
         dtype = gdal.GDT_Float32
     elif data.dtype == np.uint8:
         dtype = gdal.GDT_Byte
+    else:
+        print('error with the data format - neither float nor int')
+        return
 
     driver = gdal.GetDriverByName('GTiff')
     outRaster = driver.Create(outfile, width, length, 1, dtype, options=compress_option)
@@ -144,6 +147,8 @@ def read_bperp_file(bperp_file, imdates):
     ### Determine type of bperp_file; old or not
     with open(bperp_file) as f:
         line = f.readline().split() #list
+        if not line[0].startswith("2"):
+            line = f.readline().split()  # find first line that starts with '2'
 
     if len(line) == 4: ## new format
         bperp_dict[line[0]] = '0.00' ## single prime. unnecessary?
@@ -209,15 +214,15 @@ def read_ifg_list(ifg_listfile):
     ifgdates = []
     f = open(ifg_listfile)
     line = f.readline()
+
     while line:
-        ifgd = line.split()[0]
-        if ifgd == "#":
+        if line[0] == "2":
+            ifgd = line.split()[0]
+            ifgdates.append(str(ifgd))
             line = f.readline()
-            continue # Comment
         else:
-            ifgdates.append(ifgd)
             line = f.readline()
-    f.close()
+            continue
 
     return ifgdates
 
@@ -237,3 +242,24 @@ def get_param_par(mlipar, field):
     value = subp.check_output(['grep', field,mlipar]).decode().split()[1].strip()
     return value
 
+
+#%%
+def read_residual_file(resid_file):
+    """
+    # RMS of residual (in number of 2pi)
+    20141018_20141205  0.07
+    ...
+    20220720_20220801  0.06
+    RMS_mode:  0.05
+    RMS_median:  0.10
+    RMS_mean:  0.13
+    RMS_thresh:  0.20
+    """
+    ifg_list = []
+    residual_list = []
+    with open(resid_file) as f:
+        for l in f:
+            if l.startswith("2"):
+                ifg_list.append(l.split()[0])
+                residual_list.append(float(l.split()[1]))
+    return ifg_list, residual_list
