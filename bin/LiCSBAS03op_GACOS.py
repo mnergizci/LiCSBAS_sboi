@@ -214,6 +214,8 @@ def main(argv=None):
             raise Usage('No input directory given, -i is not optional!')
         elif not os.path.isdir(in_dir):
             raise Usage('No {} dir exists!'.format(in_dir))
+        elif len(os.listdir(in_dir)) == 0:
+            raise Usage('Dir {} is empty, cancelling'.format(in_dir))
         elif not os.path.exists(os.path.join(in_dir, 'slc.mli.par')):
             raise Usage('No slc.mli.par file exists in {}!'.format(in_dir))
         if not out_dir:
