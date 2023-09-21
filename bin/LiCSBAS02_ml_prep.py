@@ -290,7 +290,17 @@ def main(argv=None):
     if n_ifg2 > 0:
         if n_para > n_ifg2:
             n_para = n_ifg2
-
+        
+        # to perform size check:
+        try:
+            tif = glob.glob(os.path.join(geocdir,'*.tif'))[0]
+            geotiff = gdal.Open(tif)
+            width = geotiff.RasterXSize
+            length = geotiff.RasterYSize
+            geotiff = None
+        except:
+            print('no other-than-ifg tif is found')
+            width = None
         ### Create float with parallel processing
         print('  {} parallel processing...'.format(n_para), flush=True)
         p = q.Pool(n_para)
@@ -448,7 +458,13 @@ def convert_wrapper(i):
         print ('  {} cannot open. Skip'.format(ifgd+'.geo.cc.tif'), flush=True)
         shutil.rmtree(ifgdir1)
         return 1
-
+    
+    # check dimensions (here, width should be before multilooking):
+    if width:
+        if (cc.shape != (length, width)) or (unw.shape != (length, width)):
+            print('pair '+ifgd+' has different dimensions. Skipping')
+            return 1
+    
     ### Multilook
     if nlook != 1:
         unw = tools_lib.multilook(unw, nlook, nlook, n_valid_thre)
