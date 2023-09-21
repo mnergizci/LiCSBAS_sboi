@@ -45,6 +45,8 @@ LiCSBAS02_ml_prep.py -i GEOCdir [-o GEOCmldir] [-n nlook] [--freq float] [--n_pa
 """
 #%% Change log
 '''
+v1.14.2a 20230921 ML
+ - Dimensions check
 v1.7.5  20230803 Jack McGrath, Uni Leeds
  - Add cc png option
 v1.7.4b 20211111 Milan Lazecky, UniLeeds
