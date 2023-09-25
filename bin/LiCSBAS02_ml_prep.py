@@ -292,7 +292,7 @@ def main(argv=None):
     if n_ifg2 > 0:
         if n_para > n_ifg2:
             n_para = n_ifg2
-        
+
         # to perform size check:
         try:
             tif = glob.glob(os.path.join(geocdir,'*.tif'))[0]
@@ -303,6 +303,7 @@ def main(argv=None):
         except:
             print('no other-than-ifg tif is found')
             width = None
+
         ### Create float with parallel processing
         print('  {} parallel processing...'.format(n_para), flush=True)
         p = q.Pool(n_para)
