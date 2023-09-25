@@ -45,6 +45,8 @@ LiCSBAS02_ml_prep.py -i GEOCdir [-o GEOCmldir] [-n nlook] [--freq float] [--n_pa
 """
 #%% Change log
 '''
+v1.14.2a 20230921 ML
+ - Dimensions check
 v1.7.5  20230803 Jack McGrath, Uni Leeds
  - Add cc png option
 v1.7.4b 20211111 Milan Lazecky, UniLeeds
@@ -117,7 +119,7 @@ def main(argv=None):
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
     ### For parallel processing
-    global ifgdates2, geocdir, outdir, nlook, n_valid_thre, cycle, cmap_wrap, plot_cc, cmap_cc
+    global ifgdates2, geocdir, outdir, nlook, n_valid_thre, cycle, cmap_wrap, plot_cc, cmap_cc, width, length
 
 
     #%% Set default
@@ -291,6 +293,17 @@ def main(argv=None):
         if n_para > n_ifg2:
             n_para = n_ifg2
 
+        # to perform size check:
+        try:
+            tif = glob.glob(os.path.join(geocdir,'*.tif'))[0]
+            geotiff = gdal.Open(tif)
+            width = geotiff.RasterXSize
+            length = geotiff.RasterYSize
+            geotiff = None
+        except:
+            print('no other-than-ifg tif is found')
+            width = None
+
         ### Create float with parallel processing
         print('  {} parallel processing...'.format(n_para), flush=True)
         p = q.Pool(n_para)
@@ -448,7 +461,13 @@ def convert_wrapper(i):
         print ('  {} cannot open. Skip'.format(ifgd+'.geo.cc.tif'), flush=True)
         shutil.rmtree(ifgdir1)
         return 1
-
+    
+    # check dimensions (here, width should be before multilooking):
+    if width:
+        if (cc.shape != (length, width)) or (unw.shape != (length, width)):
+            print('pair '+ifgd+' has different dimensions. Skipping')
+            return 1
+    
     ### Multilook
     if nlook != 1:
         unw = tools_lib.multilook(unw, nlook, nlook, n_valid_thre)
