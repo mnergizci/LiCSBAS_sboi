@@ -119,7 +119,7 @@ def main(argv=None):
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
     ### For parallel processing
-    global ifgdates2, geocdir, outdir, nlook, n_valid_thre, cycle, cmap_wrap, plot_cc, cmap_cc
+    global ifgdates2, geocdir, outdir, nlook, n_valid_thre, cycle, cmap_wrap, plot_cc, cmap_cc, width, length
 
 
     #%% Set default
