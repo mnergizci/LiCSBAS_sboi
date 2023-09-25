@@ -2,10 +2,10 @@
 
 # LiCSBAS steps:
 #  01: LiCSBAS01_get_geotiff.py
-#  02: LiCSBAS02_ml_prep.py
-#  03: LiCSBAS03op_GACOS.py (optional)
-#  04: LiCSBAS04op_mask_unw.py (optional)
-#  05: LiCSBAS05op_clip_unw.py (optional)
+#  02to05: LiCSBAS02to05_unwrap.py   or   02: LiCSBAS02_ml_prep.py
+#                                         03: LiCSBAS03op_GACOS.py (optional)
+#                                         04: LiCSBAS04op_mask_unw.py (optional)
+#                                         05: LiCSBAS05op_clip_unw.py (optional)
 #  11: LiCSBAS11_check_unw.py
 #  12: LiCSBAS12_loop_closure.py
 #  13: LiCSBAS13_sb_inv.py
@@ -19,15 +19,20 @@
 start_step="01"	# 01-05, 11-16
 end_step="16"	# 01-05, 11-16
 
-cometdev='1'
+cometdev='0' # shortcut to use COMET's experimental/dev functions. Now rather obsolete. Recommended: 0
 nlook="1"	# multilook factor, used in step02
 GEOCmldir="GEOCml${nlook}"	# If start from 11 or later after doing 03-05, use e.g., GEOCml${nlook}GACOSmaskclip
-n_para="" # Number of paralell processing in step 02-05,12,13,16. default: number of usable CPU
+n_para="" # Number of parallel processing in step 02-05,12,13,16. default: number of usable CPU
 gpu="n"	# y/n
 check_only="n" # y/n. If y, not run scripts and just show commands to be done
 
 logdir="log"
 log="$logdir/$(date +%Y%m%d%H%M)$(basename $0 .sh)_${start_step}_${end_step}.log"
+
+freq="" # default: 5.405e9 Hz
+
+### Running the updated pipelines:
+run_reunwrapping='n' # y/n. default: 'n'. Reunwrapping would use 02to05 script instead of the original 02[,03,04,05]
 
 ### Optional steps (03-05) ###
 order_op03_05="03 04 05"	# can change order e.g., 05 03 04
@@ -40,14 +45,27 @@ p04_mask_range_file=""	# Name of file containing range list
 p05_clip_range=""	# e.g. 10:100/20:200 (ix start from 0)
 p05_clip_range_geo=""	# e.g. 130.11/131.12/34.34/34.6 (in deg)
 
+# Optional reunwrapping:
+p02to05_freq=$freq # default: 5.405e9 Hz
+p02to05_gacos="" # y/n. default: 'y'. Use gacos data if available (for majority of epochs, data without GACOS corr would be dropped)
+p02to05_hgtcorr="" # y/n. default: 'n'. Recommended for regions with high and varying topography
+p02to05_cascade="" # y/n. default: 'n'. Cascade from higher multilook factor would propagate to higher resolution (lower ML factor) data. Useful but not universal
+p02to05_thres="" # default: 0.35. Spatial consistence of the interferogram. Recommended to keep this value. If too much is masked, may try getting close to 0 (although, this would introduce some unw errors)
+p02to05_cliparea_geo=$p05_clip_range_geo # setting the clip range, e.g. 130.11/131.12/34.34/34.6 (in deg)
+p02to05_n_para=$n_para
+
 ### Frequently used options. If blank, use default. ###
 p01_start_date=""	# default: 20141001
 p01_end_date=""	# default: today
-p01_get_gacos="n" # y/n 
+p01_get_gacos="n" # y/n
+p01_get_pha="n" # y/n
+p01_get_mli="n" # y/n
 p11_unw_thre=""	# default: 0.3
 p11_coh_thre=""	# default: 0.05
-p12_loop_thre=""	# default: 1.5 rad
+p11_s_param="n" # y/n
+p12_loop_thre=""	# default: 1.5 rad. With --nullify, recommended higher value (as this is an average over the whole scene)
 p12_multi_prime="y"	# y/n. y recommended
+p12_nullify="" # y/n. y recommended
 p12_rm_ifg_list=""	# List file containing ifgs to be manually removed
 p15_coh_thre=""	# default: 0.05
 p15_n_unw_r_thre=""	# default: 1.5
@@ -71,33 +89,33 @@ p16_ex_range_geo=""	# e.g. 130.11/131.12/34.34/34.6 (in deg)
 
 ### Less frequently used options. If blank, use default. ###
 p01_frame=""	# e.g. 021D_04972_131213 
-p01_n_para=""	# default: 4
+p01_n_para=$n_para	# default: 4
 p02_GEOCdir=""	# default: GEOC
 p02_GEOCmldir=""	# default: GEOCml$nlook
-p02_freq=""	# default: 5.405e9 Hz
-p02_n_para=""   # default: # of usable CPU
+p02_freq=$freq	# default: 5.405e9 Hz
+p02_n_para=$n_para   # default: # of usable CPU
 p03_inGEOCmldir=""	# default: $GEOCmldir
 p03_outGEOCmldir_suffix="" # default: GACOS
 p03_fillhole="y"	# y/n. default: n
 p03_gacosdir=""	# default: GACOS
-p03_n_para=""   # default: # of usable CPU
+p03_n_para=$n_para   # default: # of usable CPU
 p04_inGEOCmldir=""	# default: $GEOCmldir
 p04_outGEOCmldir_suffix="" # default: mask
-p04_n_para=""   # default: # of usable CPU
+p04_n_para=$n_para   # default: # of usable CPU
 p05_inGEOCmldir=""      # default: $GEOCmldir
 p05_outGEOCmldir_suffix="" # default: clip
-p05_n_para=""   # default: # of usable CPU
+p05_n_para=$n_para   # default: # of usable CPU
 p11_GEOCmldir=""	# default: $GEOCmldir
 p11_TSdir=""	# default: TS_$GEOCmldir
 p12_GEOCmldir=""        # default: $GEOCmldir
 p12_TSdir=""    # default: TS_$GEOCmldir
-p12_n_para=""	# default: # of usable CPU
+p12_n_para=$n_para	# default: # of usable CPU
 p13_GEOCmldir=""        # default: $GEOCmldir
 p13_TSdir=""    # default: TS_$GEOCmldir
 p13_inv_alg=""	# LS (default) or WLS
 p13_mem_size=""	# default: 8000 (MB)
 p13_gamma=""	# default: 0.0001
-p13_n_para=""	# default: # of usable CPU
+p13_n_para=$n_para	# default: # of usable CPU
 p13_n_unw_r_thre=""	# defualt: 1
 p13_keep_incfile="n"	# y/n. default: n
 p14_TSdir=""    # default: TS_$GEOCmldir
@@ -109,7 +127,7 @@ p15_keep_isolated="n"	# y/n. default: n
 p15_noautoadjust="n" # y/n. default: n
 p16_TSdir=""    # default: TS_$GEOCmldir
 p16_nomask="n"	# y/n. default: n
-p16_n_para=""   # default: # of usable CPU
+p16_n_para=$n_para   # default: # of usable CPU
 
 
 #############################
@@ -122,12 +140,24 @@ echo "Log file:   $log"
 echo ""
 mkdir -p $logdir
 
+if [ $run_reunwrapping == "y" ]; then
+  # do some additional settings for the reunwrapping:
+  p01_get_pha="y"
+  p01_get_mli="y" # not really needed but useful for weighting in multilooking
+  order_op03_05='' #skipping the optional 03-05 steps, contained here
+  skipstep02=1
+else
+  skipstep02=0
+fi
+
 if [ $start_step -le 01 -a $end_step -ge 01 ];then
   p01_op=""
   if [ ! -z $p01_frame ];then p01_op="$p01_op -f $p01_frame"; fi
   if [ ! -z $p01_start_date ];then p01_op="$p01_op -s $p01_start_date"; fi
   if [ ! -z $p01_end_date ];then p01_op="$p01_op -e $p01_end_date"; fi
   if [ $p01_get_gacos == "y" ];then p01_op="$p01_op --get_gacos"; fi
+  if [ $p01_get_pha == "y" ];then p01_op="$p01_op --get_pha"; fi
+  if [ $p01_get_mli == "y" ];then p01_op="$p01_op --get_mli"; fi
   if [ ! -z $p01_n_para ];then p01_op="$p01_op --n_para $p01_n_para"; fi
 
   if [ $check_only == "y" ];then
@@ -138,7 +168,27 @@ if [ $start_step -le 01 -a $end_step -ge 01 ];then
   fi
 fi
 
-if [ $start_step -le 02 -a $end_step -ge 02 ];then
+if [ $skipstep02 -eq 1 ]; then
+  p02to05_op=""
+  if [ ! -z $p02to05_op_GEOCdir ];then p02to05_op="$p02to05_op -i $p02to05_op_GEOCdir";
+    else p02to05_op="$p02to05_op -i GEOC"; fi
+  if [ ! -z $nlook ];then p02to05_op="$p02to05_op -M $nlook"; fi
+  if [ ! -z $p02to05_freq ];then p02to05_op="$p02to05_op --freq $p02to05_freq"; fi
+  if [ ! -z $p02to05_n_para ];then p02to05_op="$p02to05_op --n_para $p02to05_n_para"; fi
+  if [ ! -z $p02to05_thres ];then p02to05_op="$p02to05_op --thres $p02to05_thres"; fi
+  if [ ! -z $p02to05_cliparea_geo ];then p02to05_op="$p02to05_op -g $p02to05_cliparea_geo"; fi
+  if [ $p02to05_cascade == "y" ];then p02to05_op="$p02to05_op --cascade"; fi
+  if [ $p02to05_hgtcorr == "y" ];then p02to05_op="$p02to05_op --hgtcorr"; fi
+  if [ $p02to05_gacos == "y" ];then p02to05_op="$p02to05_op --gacos"; fi
+
+  if [ $check_only == "y" ];then
+    echo "LiCSBAS02to05_unwrap.py $p02to05_op"
+  else
+    LiCSBAS02to05_unwrap.py $p02to05_op 2>&1 | tee -a $log
+    if [ ${PIPESTATUS[0]} -ne 0 ];then exit 1; fi
+  fi
+else
+ if [ $start_step -le 02 -a $end_step -ge 02 -a $skipstep02 -eq 0 ];then
   p02_op=""
   if [ ! -z $p02_GEOCdir ];then p02_op="$p02_op -i $p02_GEOCdir";
     else p02_op="$p02_op -i GEOC"; fi
@@ -154,6 +204,7 @@ if [ $start_step -le 02 -a $end_step -ge 02 ];then
     LiCSBAS02_ml_prep.py $p02_op 2>&1 | tee -a $log
     if [ ${PIPESTATUS[0]} -ne 0 ];then exit 1; fi
   fi
+ fi
 fi
 
 ## Optional steps
@@ -248,7 +299,7 @@ if [ $start_step -le 11 -a $end_step -ge 11 ];then
   if [ ! -z $p11_TSdir ];then p11_op="$p11_op -t $p11_TSdir"; fi
   if [ ! -z $p11_unw_thre ];then p11_op="$p11_op -u $p11_unw_thre"; fi
   if [ ! -z $p11_coh_thre ];then p11_op="$p11_op -c $p11_coh_thre"; fi
-
+  if [ $p11_s_param == "y" ];then p11_op="$p11_op -s"; fi
   if [ $check_only == "y" ];then
     echo "LiCSBAS11_check_unw.py $p11_op"
   else
@@ -264,6 +315,7 @@ if [ $start_step -le 12 -a $end_step -ge 12 ];then
   if [ ! -z $p12_TSdir ];then p12_op="$p12_op -t $p12_TSdir"; fi
   if [ ! -z $p12_loop_thre ];then p12_op="$p12_op -l $p12_loop_thre"; fi
   if [ $p12_multi_prime == "y" ];then p12_op="$p12_op --multi_prime"; fi
+  if [ $p12_nullify == "y" ];then p12_op="$p12_op --nullify"; fi
   if [ ! -z $p12_rm_ifg_list ];then p12_op="$p12_op --rm_ifg_list $p12_rm_ifg_list"; fi
   if [ ! -z $p12_n_para ];then p12_op="$p12_op --n_para $p12_n_para";
   elif [ ! -z $n_para ];then p12_op="$p12_op --n_para $n_para";fi
