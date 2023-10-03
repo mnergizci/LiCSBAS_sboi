@@ -83,6 +83,8 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] 
 """
 #%% Change log
 '''
+v1.5.5 20230928 Lin Shen, Leeds Uni
+ - Add a no loop check to exclude non-redundant interferograms for each point (recalculate the no-loop ifgs info)
 v1.5.4 20230804 Jack McGrath, Leeds Uni
  - Add store and load patches option
 v1.5.3 20211122 Milan Lazecky, Leeds Uni
@@ -181,6 +183,7 @@ def main(argv=None):
     singular = False
     only_sb = False
     nopngs = False
+    #noloop = False  # setting this later
 
     try:
         n_para = len(os.sched_getaffinity(0))
@@ -243,6 +246,8 @@ def main(argv=None):
                 only_sb = True
             elif o == '--nopngs':
                 nopngs = True
+            #elif o == '--rm_noloop':
+            #    noloop = True
             elif o == '--no_storepatches':
                 store_patches = False
             elif o == '--load_patches':
@@ -516,6 +521,35 @@ def main(argv=None):
 
         f.close()
 
+    # getting updated number of no-loop interferograms (noloop)
+    # this will work only if we previously saved the orig. unw files!
+    ifgd=ifgdates[0]
+    unwfile_ori = os.path.join(ifgdir, ifgd, ifgd + '.unw.ori')
+    if os.path.exists(unwfile_ori):
+        noloop = True
+    else:
+        noloop = False
+
+    if noloop:
+        try:
+            ref_unw_ori = []
+            for i, ifgd in enumerate(ifgdates):
+                unwfile_ori = os.path.join(ifgdir, ifgd, ifgd + '.unw.ori')
+                f = open(unwfile_ori, 'rb')
+                f.seek(countf * 4, os.SEEK_SET)  # Seek for >=2nd path, 4 means byte
+            ### Read unw data (mm) at ref area
+            unw_ori = np.fromfile(f, dtype=np.float32, count=countl).reshape((lengththis, width))[:,
+                      refx1:refx2] * coef_r2m
+            unw_ori[unw_ori == 0] = np.nan
+            if np.all(np.isnan(unw_ori)):
+                print('All nan in ref area in {}.'.format(ifgd))
+                print('Rerun LiCSBAS12.')
+                return 1
+            ref_unw_ori.append(np.nanmean(unw_ori))
+            f.close()
+        except:
+            print("Warning: skip the no loop check", flush=True)
+            noloop = False
 
     #%% Open cum.h5 for output
     ### Decide here what to do re. cumh5file and reloading patches. Need to check that stored cumh5 file is the right size etc
@@ -638,6 +672,50 @@ def main(argv=None):
                     cohpatch[cohpatch==0] = np.nan
 
             unwpatch = unwpatch.reshape((n_ifg, n_pt_all)).transpose() #(n_pt_all, n_ifg)
+
+            ### Recalculate no-loop ifgs info to remove them
+            if noloop:
+                try:
+                    for i, ifgd in enumerate(ifgdates):
+                        unwfile_ori = os.path.join(ifgdir, ifgd, ifgd + '.unw.ori')
+                        f = open(unwfile_ori, 'rb')
+                        f.seek(countf * 4, os.SEEK_SET)  # Seek for >=2nd patch, 4 means byte
+                    unw_ori = np.fromfile(f, dtype=np.float32, count=countl).reshape((lengththis, width)) * coef_r2m
+                    unw_ori[unw_ori == 0] = np.nan  # Fill 0 with nan
+                    unw_ori = unw_ori - ref_unw_ori[i]
+                    unwpatch_ori[i] = unw_ori
+                    f.close()
+                except:
+                    print("No *.unw_ori can be found, skip the no loop check", flush=True)
+                    noloop = False
+
+            # if all ok with noloop, continue
+            if noloop:
+                try:
+                    unwpatch_ori = unwpatch_ori.reshape((n_ifg, n_pt_all)).transpose()
+                except:
+                    print("No unwpatch_ori can be found, skip the no loop check", flush=True)
+                    noloop = False
+
+            # if still ok, perform the main noloop routine
+            n_para_gap = n_para
+            if noloop:
+                try:
+                    print('  with {} parallel processing...'.format(n_para_gap), flush=True)
+
+                    p = q.Pool(n_para_gap)
+                    _result = np.array(p.map(count_noloop, range(n_para_gap)), dtype=float)
+                    p.close()
+                    for nn in range(n_para_gap):
+                        if nn == 0:
+                            unwpatch = _result[0, :, :]
+                        else:
+                            unwpatch += _result[nn, :, :]
+                    del _result
+                    unwpatch = unwpatch / n_para_gap
+                except:
+                    print("Warning: skip the no loop check", flush=True)
+                    noloop = False
 
             ### Calc variance from coherence for WLS
             if inv_alg == 'WLS':
@@ -1030,6 +1108,41 @@ def count_gaps_wrapper(i):
 
     return _ns_gap_patch, _gap_patch, _ns_ifg_noloop_patch
 
+#%%
+def count_noloop(i):
+    print("    Running {:2}/{:2}th patch...".format(i+1, n_para_gap), flush=True)
+    n_pt_patch = int(np.ceil(unwpatch.shape[0]/n_para_gap))
+    n_im = G.shape[1]+1
+    n_loop, n_ifg = Aloop.shape
+
+    if i*n_pt_patch >= unwpatch.shape[0]:
+        # Nothing to do
+        return
+
+    ### n_ifg_noloop
+    # n_ifg*(n_pt,n_ifg)->(n_loop,n_pt)
+    # Number of ifgs for each loop at eath point.
+    # 3 means complete loop, 1 or 2 means broken loop.
+    ns_ifg4loop = np.dot(np.abs(Aloop),(~np.isnan(unwpatch_ori[i*n_pt_patch:(i+1)*n_pt_patch])).T)
+    bool_loop = (ns_ifg4loop==3)
+    del ns_ifg4loop
+    ns_loop4ifg = np.multiply((np.dot((np.abs(Aloop)).T,bool_loop)).T,
+                              (~np.isnan(unwpatch_ori[i*n_pt_patch:(i+1)*n_pt_patch,:]))
+                )
+    del bool_loop
+    unwpatch_patch = unwpatch[i*n_pt_patch:(i+1)*n_pt_patch,:]
+    unwpatch_patch[ns_loop4ifg==0] = np.nan
+
+    unwpatch[i*n_pt_patch:(i+1)*n_pt_patch,:] = unwpatch_patch
+    del unwpatch_patch
+    #ns_ifg_noloop_tmp = (ns_loop4ifg==0).sum(axis=1) #n_pt
+    #del ns_loop4ifg
+    _unwpatch = unwpatch
+    #ns_nan_ifg = np.isnan(unwpatch[i*n_pt_patch:(i+1)*n_pt_patch, :]).sum(axis=1)
+    #n_pt, nan ifg count
+    #_ns_loop4ifg_patch = ns_ifg_noloop_tmp - ns_nan_ifg
+    #_ns_loop4ifg_patch = _ns_loop4ifg_patch.transpose()
+    return _unwpatch
 
 #%%
 def inc_png_wrapper(imx):

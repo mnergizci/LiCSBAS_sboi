@@ -67,6 +67,10 @@ p12_loop_thre=""	# default: 1.5 rad. With --nullify, recommended higher value (a
 p12_multi_prime="y"	# y/n. y recommended
 p12_nullify="" # y/n. y recommended
 p12_rm_ifg_list=""	# List file containing ifgs to be manually removed
+p12_skippngs="" # y/n. n by default
+#p13_rmnoloop="" # y/n. n by default # not used anymore, v 1.5.5
+p13_singular="" # y/n. n by default
+p13_skippngs="" # y/n. n by default
 p15_coh_thre=""	# default: 0.05
 p15_n_unw_r_thre=""	# default: 1.5
 p15_vstd_thre=""	# default: 100 mm/yr
@@ -316,10 +320,10 @@ if [ $start_step -le 12 -a $end_step -ge 12 ];then
   if [ ! -z $p12_loop_thre ];then p12_op="$p12_op -l $p12_loop_thre"; fi
   if [ $p12_multi_prime == "y" ];then p12_op="$p12_op --multi_prime"; fi
   if [ $p12_nullify == "y" ];then p12_op="$p12_op --nullify"; fi
+  if [ $p12_skippngs == "y" ];then p12_op="$p12_op --nopngs"; fi
   if [ ! -z $p12_rm_ifg_list ];then p12_op="$p12_op --rm_ifg_list $p12_rm_ifg_list"; fi
   if [ ! -z $p12_n_para ];then p12_op="$p12_op --n_para $p12_n_para";
   elif [ ! -z $n_para ];then p12_op="$p12_op --n_para $n_para";fi
-
   if [ $check_only == "y" ];then
     echo "LiCSBAS12_loop_closure.py $p12_op"
   else
@@ -346,6 +350,9 @@ if [ $start_step -le 13 -a $end_step -ge 13 ];then
   if [ ! -z $p13_n_para ];then p13_op="$p13_op --n_para $p13_n_para"; fi
   if [ ! -z $p13_n_unw_r_thre ];then p13_op="$p13_op --n_unw_r_thre $p13_n_unw_r_thre"; fi
   if [ $p13_keep_incfile == "y" ];then p13_op="$p13_op --keep_incfile"; fi
+  #if [ $p13_rmnoloop == "y" ]; then p13_op="$p13_op --rm_noloop"; fi
+  if [ $p13_singular == "y" ]; then p13_op="$p13_op --singular"; fi
+  if [ $p13_skippngs == "y" ]; then p13_op="$p13_op --nopngs"; fi
   if [ $gpu == "y" ];then p13_op="$p13_op --gpu"; fi
 
   if [ $check_only == "y" ];then

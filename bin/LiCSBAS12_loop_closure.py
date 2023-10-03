@@ -56,7 +56,7 @@ Outputs in TS_GEOCml*/ :
 Usage
 =====
 LiCSBAS12_loop_closure.py -d ifgdir [-t tsadir] [-l loop_thre] [--multi_prime]
- [--rm_ifg_list file] [--n_para int] [--nullify] [--ref_approx lon/lat] [--skip_pngs] [--save_ori_unw]
+ [--rm_ifg_list file] [--n_para int] [--nullify] [--ref_approx lon/lat] [--nopngs] [--nullify_skip_backup]
 
  -d  Path to the GEOCml* dir containing stack of unw data.
  -t  Path to the output TS_GEOCml* dir. (Default: TS_GEOCml*)
@@ -66,8 +66,8 @@ LiCSBAS12_loop_closure.py -d ifgdir [-t tsadir] [-l loop_thre] [--multi_prime]
  --n_para  Number of parallel processing (Default: # of usable CPU)
  --nullify Nullify unw values causing loop residuals >pi, per-pixel
  --ref_approx  Approximate geographic coordinates for reference area (lon/lat)
- --skip_pngs Do not generate png previews of loop closures (often takes long)
- --save_ori_unw Save original ifgs before nullification for a later no-loop check
+ --nopngs Do not generate png previews of loop closures (often takes long)
+ --nullify_skip_backup  Do not save original ifgs (before nullification) - by default: save them. Note, skipping this backup would affect no-loop-ifg number (step 13)
 """
 # %% Change log
 '''
@@ -157,7 +157,7 @@ def main(argv=None):
     nullify = False
     ref_approx = False
     do_pngs = True
-    save_ori_unw = False
+    save_ori_unw = True
 
     try:
         n_para = len(os.sched_getaffinity(0))
@@ -173,8 +173,8 @@ def main(argv=None):
     try:
         try:
             opts, args = getopt.getopt(argv[1:], "hd:t:l:",
-                                       ["help", "multi_prime", "nullify", "skip_pngs",
-                                        "rm_ifg_list=", "n_para=", "ref_approx=", "save_ori_unw"])
+                                       ["help", "multi_prime", "nullify", "skip_pngs", "nopngs",
+                                        "rm_ifg_list=", "n_para=", "ref_approx=", "nullify_skip_backup"])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -195,12 +195,14 @@ def main(argv=None):
                 n_para = int(a)
             elif o == '--nullify':
                 nullify = True
-            elif o == '--skip_pngs':
+            elif o == '--skip_pngs' or o == '--nopngs':
                 do_pngs = False
             elif o == '--ref_approx':
                 ref_approx = a
-            elif o == '--save_ori_unw':
-                save_ori_unw = True
+            elif o == '--nullify_skip_backup':
+                save_ori_unw = False
+        if not nullify: # debug
+            save_ori_unw = False
         if not ifgdir:
             raise Usage('No data directory given, -d is not optional!')
         elif not os.path.isdir(ifgdir):
