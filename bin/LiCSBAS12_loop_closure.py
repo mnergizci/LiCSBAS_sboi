@@ -68,6 +68,7 @@ LiCSBAS12_loop_closure.py -d ifgdir [-t tsadir] [-l loop_thre] [--multi_prime]
  --ref_approx  Approximate geographic coordinates for reference area (lon/lat)
  --nopngs Do not generate png previews of loop closures (often takes long)
  --nullify_skip_backup  Do not save original ifgs (before nullification) - by default: save them. Note, skipping this backup would affect no-loop-ifg number (step 13)
+ --nullify_threshold Threshold to detect phase loop closure errors (Default: pi) [rad]
 """
 # %% Change log
 '''
@@ -145,7 +146,7 @@ def main(argv=None):
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
-    global Aloop, ifgdates, ifgdir, length, width, loop_pngdir, cycle, \
+    global Aloop, ifgdates, ifgdir, length, width, loop_pngdir, cycle, nullify_threshold \
         multi_prime, bad_ifg, noref_ifg, bad_ifg_all, refy1, refy2, refx1, refx2  ## for parallel processing
 
     # %% Set default
@@ -158,6 +159,7 @@ def main(argv=None):
     ref_approx = False
     do_pngs = True
     save_ori_unw = True
+    nullify_threshold = np.pi
 
     try:
         n_para = len(os.sched_getaffinity(0))
@@ -174,7 +176,7 @@ def main(argv=None):
         try:
             opts, args = getopt.getopt(argv[1:], "hd:t:l:",
                                        ["help", "multi_prime", "nullify", "skip_pngs", "nopngs",
-                                        "rm_ifg_list=", "n_para=", "ref_approx=", "nullify_skip_backup"])
+                                        "rm_ifg_list=", "n_para=", "ref_approx=", "nullify_skip_backup", "nullify_threshold="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -201,6 +203,8 @@ def main(argv=None):
                 ref_approx = a
             elif o == '--nullify_skip_backup':
                 save_ori_unw = False
+            elif o == '--nullify_threshold':
+                nullify_threshold = a
         if not nullify: # debug
             save_ori_unw = False
         if not ifgdir:
@@ -1113,7 +1117,7 @@ def loop_closure_4th_wrapper(args):
 
 # for now, without parallelism
 def loop_closure_4th(args, da):
-    nullify_threshold = np.pi
+    #nullify_threshold = np.pi
     i0, i1 = args
     n_loop = Aloop.shape[0]
     ns_loop_err1 = np.zeros((length, width), dtype=np.int16)
