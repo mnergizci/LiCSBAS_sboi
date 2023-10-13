@@ -137,16 +137,18 @@ def main(argv=None):
             elif o == '--hgtcorr':
                 hgtcorr = True
             elif o == '--cascade':
-                if a == 0:
+                if not a:
+                    cascade=True  # just setting cascade on
+                elif int(a) == 0:
                     cascade=False
-                elif a == 10:
+                elif int(a) == 10:
                     cascade=True
                     only10 = True
-                elif a == 1:
+                elif int(a) == 1:
                     cascade=True
                     only10 = False
                 else:
-                    raise Usage('ERROR, wrong value set for the cascade parameter')
+                    raise Usage('Wrong value set for the cascade parameter. Use 0 (off), 1 (on) or 10 (on, with one 10xML factor step). Default is 10.')
             elif o == '--freq':
                 freq = float(a)
             elif o == '--n_para':
