@@ -50,7 +50,8 @@ LiCSBAS02to05_unwrap.py -i WORKdir [-M nlook] [-g lon1/lon2/lat1/lat2] [--gacos]
  --freq    Radar frequency in Hz (Default: 5.405e9 for Sentinel-1)
            (e.g., 1.27e9 for ALOS, 1.2575e9 for ALOS-2/U, 1.2365e9 for ALOS-2/{F,W})
  --n_para  Number of parallel processing (Default: # of usable CPU)
-
+ --nolandmask Do not apply landmask (ON by default)
+ 
 The command will run reunwrapping on interferograms inside WORKdir/GEOC.
 Outputs are stored inside WORKdir/GEOCmlX[GACOS][clip] where X is the multilooking factor (-M).
 For more information about the procedure, see e.g. https://ieeexplore.ieee.org/document/9884337
@@ -110,6 +111,7 @@ def main(argv=None):
     only10 = True
     hgtcorr = False
     gacoscorr = False
+    do_landmask = True
     
     try:
         nproc = len(os.sched_getaffinity(0))
@@ -119,7 +121,7 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hi:g:M:", ["help", "gacos", "hgtcorr", "cascade=", "thres=", "freq=", "n_para="])
+            opts, args = getopt.getopt(argv[1:], "hi:g:M:", ["help", "gacos", "hgtcorr", "cascade=", "nolandmask", "thres=", "freq=", "n_para="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -136,6 +138,8 @@ def main(argv=None):
                 gacoscorr = True
             elif o == '--hgtcorr':
                 hgtcorr = True
+            elif o == '--nolandmask':
+                do_landmask = False
             elif o == '--cascade':
                 if not a:
                     cascade=True  # just setting cascade on
@@ -189,7 +193,7 @@ def main(argv=None):
                 # keeping the 'not-to-be-changed'defaults:
                 goldstein = True, smooth = False, lowpass = False, defomax = 0.3, dolocal = True, frame = 'dummy', specmag = True, 
                 pairsetfile = None, subtract_gacos = True, export_to_tif = False,
-                keep_coh_debug = True, use_amp_coh = False, use_coh_stab = False, use_amp_stab = False, gacosdir = '../GACOS')
+                keep_coh_debug = True, use_amp_coh = False, use_coh_stab = False, use_amp_stab = False, gacosdir = '../GACOS', do_landmask = do_landmask)
     
     #%% Finish
     elapsed_time = time.time()-start
