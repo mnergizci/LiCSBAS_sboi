@@ -190,9 +190,13 @@ def main(argv=None):
         try:
             unw = io_lib.read_img(unwfile, length, width)
         except:
-            print('probably dimension ERROR in '+ifgd+' unw file - source file inconsistent in LiCSAR frame. Deleting multilooked')
+            print('probably dimension ERROR in '+ifgd+' unw file - source file inconsistent in LiCSAR frame. Moving to a backup folder (will not use)')
             #we can directly delete it here, as we work with ml* data
-            shutil.rmtree(os.path.dirname(unwfile))
+            #shutil.rmtree(os.path.dirname(unwfile))
+            backupsfolder = os.path.dirname(unwfile)[:-18]+'.backup'
+            if not os.path.exists(backupsfolder):
+                os.mkdir(backupsfolder)
+            shutil.move(os.path.dirname(unwfile), os.path.join(backupsfolder, ifgd))
 
     #%% Read date and network information
     ### Get dates
