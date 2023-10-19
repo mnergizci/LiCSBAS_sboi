@@ -185,6 +185,7 @@ def main(argv=None):
     if cliparea_geo:
         outdir=outdir+'clip'
     outdir = os.path.join(workdir, outdir)
+    os.chdir(outdir) # need to run the processing here..
     print('Running unwrapping using given parameters')
     unw.process_frame(ml = ml, thres = thres, cliparea_geo = cliparea_geo, 
                 cascade=cascade, only10 = only10,
@@ -195,6 +196,7 @@ def main(argv=None):
                 pairsetfile = None, subtract_gacos = True, export_to_tif = False,
                 keep_coh_debug = True, use_amp_coh = False, use_coh_stab = False, use_amp_stab = False, gacosdir = '../GACOS', do_landmask = do_landmask)
     
+    os.chdir(workdir)
     #%% Finish
     elapsed_time = time.time()-start
     hour = int(elapsed_time/3600)
