@@ -40,16 +40,16 @@ Usage
 =====
 LiCSBAS02to05_unwrap.py -i WORKdir [-M nlook] [-g lon1/lon2/lat1/lat2] [--gacos] [--hgtcorr] [--cascade int] [--thres float] [--freq float] [--n_para int]
 
- -i  Path to the work directory (i.e. folder that contains the input GEOC dir with the stack of geotiff data, and optionally other dirs: GEOC.MLI, GACOS)
- -M  Number of multilooking factor (Default: 10, 10x10 multilooking)
- -g  Range to be clipped in geographical coordinates (deg)
+ -i  <str> Path to the work directory (i.e. folder that contains the input GEOC dir with the stack of geotiff data, and optionally other dirs: GEOC.MLI, GACOS)
+ -M  <int> Number of multilooking factor (Default: 10, 10x10 multilooking)
+ -g  <str> Range to be clipped in geographical coordinates (deg), as lon1/lon2/lat1/lat2
  --gacos   Use GACOS data (recommended, expects GACOS folder - see LiCSBAS_01_get_geotiff.py). Note this will limit dataset to epochs with GACOS correction.
  --hgtcorr Apply height-correlation correction (default: not apply). Note this will be turned off if GACOS is to be used.
- --cascade Apply cascade unwrapping approach: 0=no cascade, 10=cascade with 10xML layer (default), 1=full cascade through 10-5-3xML layers
- --thres   Threshold value for masking noise based on consistence (Default: 0.3)
- --freq    Radar frequency in Hz (Default: 5.405e9 for Sentinel-1)
+ --cascade [1,10] Apply cascade unwrapping approach: no parameter or 10=cascade with 10xML layer (default), 1=full cascade through 10-5-3xML layers (experimental)
+ --thres <float> Threshold value for masking noise based on consistence (Default: 0.3)
+ --freq <float>   Radar frequency in Hz (Default: 5.405e9 for Sentinel-1)
            (e.g., 1.27e9 for ALOS, 1.2575e9 for ALOS-2/U, 1.2365e9 for ALOS-2/{F,W})
- --n_para  Number of parallel processing (Default: # of usable CPU)
+ --n_para <int> Number of parallel processing (Default: # of usable CPU)
  --nolandmask Do not apply landmask (ON by default)
  
 The command will run reunwrapping on interferograms inside WORKdir/GEOC.
@@ -107,7 +107,7 @@ def main(argv=None):
     freq = 5405000000
     thres = 0.3
     cliparea_geo = None
-    cascade = True
+    cascade = False
     only10 = True
     hgtcorr = False
     gacoscorr = False
@@ -143,6 +143,7 @@ def main(argv=None):
             elif o == '--cascade':
                 if not a:
                     cascade=True  # just setting cascade on
+                    only10 = True
                 elif int(a) == 0:
                     cascade=False
                 elif int(a) == 10:
