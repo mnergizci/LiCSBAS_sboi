@@ -186,6 +186,8 @@ def main(argv=None):
     if cliparea_geo:
         outdir=outdir+'clip'
     outdir = os.path.join(workdir, outdir)
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
     os.chdir(outdir) # need to run the processing here..
     print('Running unwrapping using given parameters')
     unw.process_frame(ml = ml, thres = thres, cliparea_geo = cliparea_geo, 
