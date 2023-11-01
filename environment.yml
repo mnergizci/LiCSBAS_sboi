@@ -27,4 +27,4 @@ dependencies:
   - dask
   - colorcet
   - networkx
-  
+  - scipy

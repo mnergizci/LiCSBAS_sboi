@@ -8,6 +8,8 @@ Python3 library of time series inversion functions for LiCSBAS.
 =========
 Changelog
 =========
+20231101 Milan Lazecky based on findings by Yasser Maghsoudi, Uni Leeds
+ - changed least squares function from np to scipy.sparse for faster NSBAS inversion
 v1.5.2 20211122 Milan Lazecky, Uni Leeds
  - use bit more economic computations (for tutorial purposes)
 v1.5.1 20210309 Yu Morishita, GSI
@@ -37,6 +39,7 @@ import datetime as dt
 import multiprocessing as multi
 from astropy.stats import bootstrap
 from astropy.utils import NumpyRNGContext
+from scipy.sparse.linalg import lsqr as scipylsq
 import LiCSBAS_tools_lib as tools_lib
 try:
     from sklearn.linear_model import RANSACRegressor
@@ -706,7 +709,9 @@ def censored_lstsq_slow(A, B, M):
 
         m = M[:,i] # drop rows where mask is zero
         try:
-            X[:,i] = np.linalg.lstsq(A[m], B[m,i], rcond=None)[0]
+            #X[:,i] = np.linalg.lstsq(A[m], B[m,i], rcond=None)[0]
+            # 20231101 update
+            X[:, i] = scipylsq(A[m], B[m, i], atol=1e-06, btol=1e-06)[0]
         except:
             X[:,i] = np.nan
 

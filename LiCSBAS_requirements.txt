@@ -16,4 +16,5 @@ netCDF4
 bottleneck
 colorcet
 networkx
+scipy
 git+git://github.com/comet-licsar/licsar_extra.git#egg=licsar_extra
