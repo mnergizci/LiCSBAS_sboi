@@ -39,7 +39,8 @@ import datetime as dt
 import multiprocessing as multi
 from astropy.stats import bootstrap
 from astropy.utils import NumpyRNGContext
-from scipy.sparse.linalg import lsqr as scipylsq
+from scipy.sparse.linalg import lsqr as sparselsq
+from scipy.sparse import csr_matrix, csc_matrix # but maybe coo_matrix would be better for G? to be checked
 import LiCSBAS_tools_lib as tools_lib
 try:
     from sklearn.linear_model import RANSACRegressor
@@ -703,6 +704,8 @@ def censored_lstsq_slow(A, B, M):
     """
 
     X = np.empty((A.shape[1], B.shape[1]))
+    # 20231101 update - not tested
+    A = csr_matrix(A) # or csc?
     for i in range(B.shape[1]):
         if np.mod(i, 100) == 0:
              print('\r  Running {0:6}/{1:6}th point...'.format(i, B.shape[1]), end='', flush=True)
@@ -711,7 +714,7 @@ def censored_lstsq_slow(A, B, M):
         try:
             #X[:,i] = np.linalg.lstsq(A[m], B[m,i], rcond=None)[0]
             # 20231101 update
-            X[:, i] = scipylsq(A[m], B[m, i], atol=1e-06, btol=1e-06)[0]
+            X[:, i] = sparselsq(A[m], B[m, i], atol=1e-06, btol=1e-06)[0]
         except:
             X[:,i] = np.nan
 
