@@ -60,9 +60,9 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] 
 
  -d  Path to the GEOCml* dir containing stack of unw data
  -t  Path to the output TS_GEOCml* dir.
- --inv_alg    Inversion algolism (Default: LS)
+ --inv_alg    Inversion algorithm (Default: LS)
    LS :       NSBAS Least Square with no weight
-   WLS:       NSBAS Weighted Least Square (not well tested)
+   WLS:       NSBAS Weighted Least Square
               Weight (variance) is calculated by (1-coh**2)/(2*coh**2)
  --mem_size   Max memory size for each patch in MB. (Default: 8000)
  --gamma      Gamma value for NSBAS inversion (Default: 0.0001)
@@ -80,9 +80,12 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] 
  --nopngs     Avoid generating some (unnecessary) PNG previews of increment residuals etc.
  --no_storepatches Don't store completed patch data [default: store patches in case of job timeout]
  --load_patches Load previously completed patches first [default: No, restart inversion]
+ --input_units Units of the input data. Possible values: ['rad', 'mm', 'm']. Default: rad
 """
 #%% Change log
 '''
+20231101 Milan Lazecky, Leeds Uni
+ - option for input data in metric units
 v1.5.5 20230928 Lin Shen, Leeds Uni
  - Add a no loop check to exclude non-redundant interferograms for each point (recalculate the no-loop ifgs info)
 v1.5.4 20230804 Jack McGrath, Leeds Uni
@@ -184,6 +187,7 @@ def main(argv=None):
     only_sb = False
     nopngs = False
     #noloop = False  # setting this later
+    input_units = 'rad'
 
     try:
         n_para = len(os.sched_getaffinity(0))
@@ -213,7 +217,7 @@ def main(argv=None):
     try:
         try:
             opts, args = getopt.getopt(argv[1:], "hd:t:",
-                                       ["help",  "mem_size=", "gamma=",
+                                       ["help",  "mem_size=", "input_units=", "gamma=",
                                         "n_unw_r_thre=", "keep_incfile", "nopngs",
                                         "inv_alg=", "n_para=", "gpu", "singular", "only_sb", "no_storepatches", "load_patches"])
         except getopt.error as msg:
@@ -230,6 +234,8 @@ def main(argv=None):
                 memory_size = float(a)
             elif o == '--gamma':
                 gamma = float(a)
+            elif o == '--input_units':
+                input_units = a
             elif o == '--n_unw_r_thre':
                 n_unw_r_thre = float(a)
             elif o == '--keep_incfile':
@@ -263,6 +269,8 @@ def main(argv=None):
         if gpu:
             print("\nGPU option is activated. Need cupy module.\n")
             import cupy as cp
+        if input_units not in ['rad', 'mm', 'm']:
+            raise Usage("Wrong units of the input data - available options are: rad, mm, m.")
 
     except Usage as err:
         print("\nERROR:", file=sys.stderr, end='')
@@ -340,7 +348,13 @@ def main(argv=None):
     speed_of_light = 299792458 #m/s
     radar_frequency = float(io_lib.get_param_par(mlipar, 'radar_frequency')) #Hz
     wavelength = speed_of_light/radar_frequency #meter
-    coef_r2m = -wavelength/4/np.pi*1000 #rad -> mm, positive is -LOS
+    # get coef to convert to mm
+    if input_units == 'rad':
+        coef_r2m = -wavelength/4/np.pi*1000 #rad -> mm, positive is -LOS
+    elif input_units == 'mm':
+        coef_r2m = 1 # expecting this positive in -LOS (subsidence is negative)
+    elif input_units == 'm':
+        coef_r2m = 1000 # expecting this positive in -LOS (subsidence is negative)
 
     ### Calc pixel spacing depending on IFG or GEOC, used in later spatial filter
     dempar = os.path.join(ifgdir, 'EQA.dem_par')
