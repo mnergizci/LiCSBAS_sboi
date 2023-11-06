@@ -69,6 +69,7 @@ import getopt
 import os
 import sys
 import time
+import numpy as np
 import multiprocessing as multi
 try:
     import lics_unwrap as unw
