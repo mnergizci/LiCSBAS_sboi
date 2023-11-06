@@ -38,14 +38,15 @@ Outputs in GEOCmlX[GACOS][clip]:
 =====
 Usage
 =====
-LiCSBAS02to05_unwrap.py -i WORKdir [-M nlook] [-g lon1/lon2/lat1/lat2] [--gacos] [--hgtcorr] [--cascade int] [--thres float] [--freq float] [--n_para int]
+LiCSBAS02to05_unwrap.py -i WORKdir [-M nlook] [-g lon1/lon2/lat1/lat2] [--gacos] [--hgtcorr] [--cascade/--cascade_full] [--thres float] [--freq float] [--n_para int]
 
  -i  <str> Path to the work directory (i.e. folder that contains the input GEOC dir with the stack of geotiff data, and optionally other dirs: GEOC.MLI, GACOS)
  -M  <int> Number of multilooking factor (Default: 10, 10x10 multilooking)
  -g  <str> Range to be clipped in geographical coordinates (deg), as lon1/lon2/lat1/lat2
  --gacos   Use GACOS data (recommended, expects GACOS folder - see LiCSBAS_01_get_geotiff.py). Note this will limit dataset to epochs with GACOS correction.
  --hgtcorr Apply height-correlation correction (default: not apply). Note this will be turned off if GACOS is to be used.
- --cascade [1,10] Apply cascade unwrapping approach: no parameter or 10=cascade with 10xML layer (default), 1=full cascade through 10-5-3xML layers (experimental)
+ --cascade  Apply cascade unwrapping approach: 1 cascade with 10xML layer (recommended)
+ --cascade_full Apply full cascade unwrapping approach: 3 cascade steps through 10-5-3xML layers (experimental)
  --thres <float> Threshold value for masking noise based on consistence (Default: 0.3)
  --freq <float>   Radar frequency in Hz (Default: 5.405e9 for Sentinel-1)
            (e.g., 1.27e9 for ALOS, 1.2575e9 for ALOS-2/U, 1.2365e9 for ALOS-2/{F,W})
@@ -122,7 +123,7 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hi:g:M:", ["help", "gacos", "hgtcorr", "cascade=", "nolandmask", "thres=", "freq=", "n_para="])
+            opts, args = getopt.getopt(argv[1:], "hi:g:M:", ["help", "gacos", "hgtcorr", "cascade", "cascade_full", "nolandmask", "thres=", "freq=", "n_para="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -142,19 +143,13 @@ def main(argv=None):
             elif o == '--nolandmask':
                 do_landmask = False
             elif o == '--cascade':
-                if not a:
-                    cascade=True  # just setting cascade on
-                    only10 = True
-                elif int(a) == 0:
-                    cascade=False
-                elif int(a) == 10:
-                    cascade=True
-                    only10 = True
-                elif int(a) == 1:
-                    cascade=True
-                    only10 = False
-                else:
-                    raise Usage('Wrong value set for the cascade parameter. Use 0 (off), 1 (on) or 10 (on, with one 10xML factor step). Default is 10.')
+                cascade = True
+                only10 = True
+            elif o == '--cascade_full':
+                if cascade:
+                    print('both cascade params set. Prioritising the cascade_full param')
+                cascade = True
+                only10 = False
             elif o == '--freq':
                 freq = float(a)
             elif o == '--n_para':
