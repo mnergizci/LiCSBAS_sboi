@@ -8,7 +8,7 @@ Python3 library of time series inversion functions for LiCSBAS.
 =========
 Changelog
 =========
-20231101 Milan Lazecky based on findings by Yasser Maghsoudi, Uni Leeds
+20231101 Yasser Maghsoudi (and ML), Uni Leeds
  - changed least squares function from np to scipy.sparse for faster NSBAS inversion
 v1.5.2 20211122 Milan Lazecky, Uni Leeds
  - use bit more economic computations (for tutorial purposes)
