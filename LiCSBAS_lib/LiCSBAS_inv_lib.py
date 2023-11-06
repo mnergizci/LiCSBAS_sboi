@@ -273,11 +273,13 @@ def singular_nsbas(d,G,m,dt_cum):
 
 def censored_lstsq_slow_para_wrapper(i):
     ### Use global value
+    A = csc_array(Gall) # can do it earlier?
     if np.mod(i, 100) == 0:
         print('  Running {0:6}/{1:6}th point...'.format(i, unw_tmp.shape[1]), flush=True)
     m = mask[:,i] # drop rows where mask is zero
     try:
-        X = np.linalg.lstsq(Gall[m], unw_tmp[m,i], rcond=None)[0]
+        #X = np.linalg.lstsq(Gall[m], unw_tmp[m,i], rcond=None)[0]
+        X = sparselsq(Gall[m], unw_tmp[m, i], atol=1e-05, btol=1e-05)[0]
     except:
         X = np.zeros((Gall.shape[1]), dtype=np.float32)*np.nan
     return X
