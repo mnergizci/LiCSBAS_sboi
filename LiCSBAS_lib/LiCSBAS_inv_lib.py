@@ -195,6 +195,7 @@ def invert_nsbas(unw, G, dt_cum, gamma, n_core, gpu, singular=False, only_sb=Fal
             args = [i for i in range(n_pt-n_pt_full)]
             q = multi.get_context('fork')
             p = q.Pool(n_core)
+            A = csc_array(Gall)  # or csr?
             _result = p.map(censored_lstsq_slow_para_wrapper, args) #list[n_pt][length]
             result[:, ~bool_pt_full] = np.array(_result).T
             #
@@ -273,13 +274,13 @@ def singular_nsbas(d,G,m,dt_cum):
 
 def censored_lstsq_slow_para_wrapper(i):
     ### Use global value
-    A = csc_array(Gall) # can do it earlier?
+    #A = csc_array(Gall) # or csr?
     if np.mod(i, 100) == 0:
         print('  Running {0:6}/{1:6}th point...'.format(i, unw_tmp.shape[1]), flush=True)
     m = mask[:,i] # drop rows where mask is zero
     try:
         #X = np.linalg.lstsq(Gall[m], unw_tmp[m,i], rcond=None)[0]
-        X = sparselsq(Gall[m], unw_tmp[m, i], atol=1e-05, btol=1e-05)[0]
+        X = sparselsq(A[m], unw_tmp[m, i], atol=1e-05, btol=1e-05)[0]
     except:
         X = np.zeros((Gall.shape[1]), dtype=np.float32)*np.nan
     return X
@@ -709,7 +710,7 @@ def censored_lstsq_slow(A, B, M):
     X = np.empty((A.shape[1], B.shape[1]))
     # 20231101 update - not tested
     #A = csr_matrix(A) # or csc?
-    A = csc_array(A) # or csc?
+    A = csc_array(A) # or csr?
     for i in range(B.shape[1]):
         if np.mod(i, 100) == 0:
              print('\r  Running {0:6}/{1:6}th point...'.format(i, B.shape[1]), end='', flush=True)
