@@ -69,7 +69,7 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] 
  --n_para     Number of parallel processing (Default: # of usable CPU)
  --n_unw_r_thre
      Threshold of n_unw (number of used unwrap data)
-     (Note this value is ratio to the number of images; i.e., 1.5*n_im)
+     (Note this value is ratio to the number of images (epochs); i.e., 1.5*n_im)
      Larger number (e.g. 2.5) makes processing faster but result sparser.
      (Default: 1 and 0.5 for C- and L-band, respectively)
  --keep_incfile

@@ -120,7 +120,7 @@ p13_inv_alg=""	# LS (default) or WLS
 p13_mem_size=""	# default: 8000 (MB)
 p13_gamma=""	# default: 0.0001
 p13_n_para=$n_para	# default: # of usable CPU
-p13_n_unw_r_thre=""	# defualt: 1
+p13_n_unw_r_thre=""	# default: 1 for shorter-than-L-band-wavelength (if cometdev, will set to 0.1)
 p13_keep_incfile="n"	# y/n. default: n
 p14_TSdir=""    # default: TS_$GEOCmldir
 p14_mem_size="" # default: 4000 (MB)
@@ -360,6 +360,9 @@ if [ $start_step -le 13 -a $end_step -ge 13 ];then
   else
     if [ $cometdev -eq 1 ]; then
      extra='--nopngs'
+     if [ -z $p13_n_unw_r_thre ];then
+       extra=$extra' --n_unw_r_thre 0.1'
+     fi
      #extra='--singular --nopngs'
     else
      extra=''

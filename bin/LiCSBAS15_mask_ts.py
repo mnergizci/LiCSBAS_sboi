@@ -202,7 +202,11 @@ def main(argv=None):
     maskts_png = os.path.join(tsadir,'mask_ts.png')
     maskts2_png = os.path.join(tsadir,'mask_ts_masked.png')
 
-    names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err', 'resid_rms'] ## noise indices
+    if os.path.exists(os.path.join(resultsdir, 'n_nullify')):
+        names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_nullify', 'resid_rms']  ## noise indices
+    else:
+        names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err', 'resid_rms'] ## noise indices
+        # TODO: coh_mindays/lt (instead of vstd as: ['n_unw', 'coh_avg', 'coh_mindays', ...])
     gt_lt = ['lt', 'lt', 'gt', 'lt', 'gt', 'gt', 'gt', 'gt', 'gt'] ## > or <
     ## gt: greater values than thre are masked 
     ## lt: more little values than thre are masked (coh_avg, n_unw, maxTlen)
