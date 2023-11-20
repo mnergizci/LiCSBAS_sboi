@@ -711,10 +711,18 @@ def main(argv=None):
 
     # %% Saving coh_avg, n_unw, and n_loop_err only for good ifgs
     print('\nSaving coh_avg, n_unw, and n_loop_err...', flush=True)
+
+
     ### Calc coh avg and n_unw
     coh_avg = np.zeros((length, width), dtype=np.float32)
     n_coh = np.zeros((length, width), dtype=np.int16)
     n_unw = np.zeros((length, width), dtype=np.int16)
+
+    btemps = tools_lib.calc_temporal_baseline(ifgdates_good)
+    thisbtemp = max(set(btemps), key=btemps.count)
+    coh_avg_freq = np.zeros((length, width), dtype=np.float32)
+    n_coh_freq = np.zeros((length, width), dtype=np.int16)
+    ii = 0
     for ifgd in ifgdates_good:
         ccfile = os.path.join(ifgdir, ifgd, ifgd + '.cc')
         if os.path.getsize(ccfile) == length * width:
@@ -726,16 +734,24 @@ def main(argv=None):
 
         coh_avg += coh
         n_coh += (coh != 0)
-
-        unwfile = os.path.join(ifgdir, ifgd, ifgd + '.unw')
+        if btemps[ii] == thisbtemp:
+            coh_avg_freq += coh
+            n_coh_freq += (coh != 0)
+        ii = ii + 1
+        unwfile = os.path.join(ifgdir, ifgd, ifgd+'.unw')
         unw = io_lib.read_img(unwfile, length, width)
-
-        unw[unw == 0] = np.nan  # Fill 0 with nan
-        n_unw += ~np.isnan(unw)  # Summing number of unnan unw
+        unw[unw == 0] = np.nan # Fill 0 with nan
+        n_unw += ~np.isnan(unw) # Summing number of unnan unw
 
     coh_avg[n_coh == 0] = np.nan
     n_coh[n_coh == 0] = 1  # to avoid zero division
     coh_avg = coh_avg / n_coh
+    coh_avg[coh_avg == 0] = np.nan
+
+    coh_avg_freq[n_coh_freq == 0] = np.nan
+    n_coh_freq[n_coh_freq == 0] = 1  # to avoid zero division
+    coh_avg_freq = coh_avg_freq / n_coh_freq
+    coh_avg_freq[coh_avg_freq == 0] = np.nan
 
     ### Save files
     n_unwfile = os.path.join(resultsdir, 'n_unw')
@@ -743,6 +759,9 @@ def main(argv=None):
 
     coh_avgfile = os.path.join(resultsdir, 'coh_avg')
     coh_avg.tofile(coh_avgfile)
+
+    coh_avgFfile = os.path.join(resultsdir, 'coh_avg_'+str(thisbtemp))
+    coh_avg_freq.tofile(coh_avgFfile)
 
     n_loop_errfile = os.path.join(resultsdir, 'n_loop_err')
     np.float32(ns_loop_err).tofile(n_loop_errfile)
@@ -754,6 +773,10 @@ def main(argv=None):
     ### Save png
     title = 'Average coherence'
     plot_lib.make_im_png(coh_avg, coh_avgfile + '.png', cmap_noise, title)
+
+    title = 'Average {} days coherence'.format(str(thisbtemp))
+    plot_lib.make_im_png(coh_avg_freq, coh_avgFfile + '.png', cmap_noise, title)
+
     title = 'Number of used unw data'
     plot_lib.make_im_png(n_unw, n_unwfile + '.png', cmap_noise, title, n_im)
 
