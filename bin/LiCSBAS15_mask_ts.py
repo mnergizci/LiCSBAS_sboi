@@ -38,7 +38,7 @@ LiCSBAS15_mask_ts.py -t tsadir [-c coh_thre] [-u n_unw_r_thre] [-v vstd_thre]
  -g  Threshold of n_gap (number of gaps in network)
  -s  Threshold of stc (spatio-temporal consistency (mm))
  -i  Threshold of n_ifg_noloop (number of ifgs with no loop)
- -l  Threshold of n_loop_err (number of loop_err)
+ -l  Threshold of n_loop_err (number of loop_err) - in case of nullification in step 12, this will apply the threshold on n_nullify
  -r  Threshold of resid_rms (RMS of residuals in inversion (mm))
  --v[min|max]  Min|Max value for output figure of velocity (Default: auto)
  --keep_isolated  Keep (not mask) isolated pixels
@@ -224,6 +224,16 @@ def main(argv=None):
     
     #%% Determine default thresholds depending on frequency band
     if not 'maxTlen' in thre_dict: thre_dict['maxTlen'] = 1
+    if not 'n_nullify' in thre_dict:
+        if 'n_loop_err' in thre_dict:
+            # if we used -l, we can use the same number for the n_nullify
+            thre_dict['n_nullify'] = thre_dict['n_loop_err']
+        else:
+            try:
+                with open(os.path.join(tsadir, '12loop', 'loop_info.txt'), 'r') as fp:
+                    thre_dict['n_nullify'] = int((len(fp.readlines()) - 4)/3)   # set threshold as 'bad in all loops'
+            except:
+                thre_dict['n_nullify'] = 1000
     if not 'n_ifg_noloop' in thre_dict:
         try:
             thre_dict['n_ifg_noloop'] = len(os.listdir(os.path.join(tsadir, '12no_loop_ifg_ras')))+1
