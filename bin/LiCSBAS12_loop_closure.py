@@ -766,9 +766,19 @@ def main(argv=None):
     n_loop_errfile = os.path.join(resultsdir, 'n_loop_err')
     np.float32(ns_loop_err).tofile(n_loop_errfile)
 
+    # ML: store ratio, use instead of looperr?
+    ns_loop_err_rat = ns_loop_err / n_loop
+    n_loop_err_rat_file = os.path.join(resultsdir, 'n_loop_err_rat')
+    np.float32(ns_loop_err_rat).tofile(n_loop_err_rat_file)
+
     # if save_ori_unw:   #ML: saving always
     n_nullify_file = os.path.join(resultsdir, 'n_nullify')
     np.float32(n_nullify).tofile(n_nullify_file)
+
+    # ML: store ratio (is similar to ns_loop_err_rat?)
+    n_nullify_rat = n_nullify/(n_unw - len(no_loop_ifg))
+    n_nullify_rat_file = os.path.join(resultsdir, 'n_nullify_rat')
+    np.float32(n_nullify_rat).tofile(n_nullify_rat_file)
 
     ### Save png
     title = 'Average coherence'
@@ -783,9 +793,15 @@ def main(argv=None):
     title = 'Number of unclosed loops'
     plot_lib.make_im_png(ns_loop_err, n_loop_errfile + '.png', cmap_noise_r, title)
 
+    title = 'Ratio of unclosed loops vs all triplets'
+    plot_lib.make_im_png(ns_loop_err_rat, n_loop_err_rat_file + '.png', cmap_noise_r, title)
+
     # if save_ori_unw:
     title = 'Number of nullified ifgs'
     plot_lib.make_im_png(n_nullify, n_nullify_file + '.png', cmap_noise_r, title)
+
+    title = 'Ratio of nullified pixels in unw data with loops'
+    plot_lib.make_im_png(n_nullify_rat, n_nullify_rat_file + '.png', cmap_noise_r, title)
 
     # %% Link ras
     ### First, identify suffix of raster image (ras, bmp, or png?)

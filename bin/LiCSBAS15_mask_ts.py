@@ -53,6 +53,8 @@ LiCSBAS15_mask_ts.py -t tsadir [-c coh_thre] [-u n_unw_r_thre] [-v vstd_thre]
 """
 #%% Change log
 '''
+20231121 ML, UoL
+ - use of n_nullify (TODO: check'n'use ratios for both orig -l and after nullify)
 v1.8.2 20211129 Milan Lazecky, Uni of Leeds
  - Change default -i as global number of no_loop_ifgs + 1
 v1.8.1 20200911 Yu Morishita, GSI
@@ -81,7 +83,7 @@ v1.0 20190724 Yu Morishita, Uni of Leeds and GSI
 #%% Import
 from LiCSBAS_meta import *
 import getopt
-import os
+import os, glob
 os.environ['QT_QPA_PLATFORM']='offscreen'
 import sys
 import time
@@ -202,17 +204,41 @@ def main(argv=None):
     maskts_png = os.path.join(tsadir,'mask_ts.png')
     maskts2_png = os.path.join(tsadir,'mask_ts_masked.png')
 
-    if os.path.exists(os.path.join(resultsdir, 'n_nullify')):
-        names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_nullify', 'resid_rms']  ## noise indices
+    #if os.path.exists(os.path.join(resultsdir, 'n_nullify')):
+    #    names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_nullify', 'resid_rms']  ## noise indices
+    #else:
+    #    names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err', 'resid_rms'] ## noise indices
+    #    # TODO: coh_mindays/lt (instead of vstd as: ['n_unw', 'coh_avg', 'coh_mindays', ...])
+
+    if os.path.exists(os.path.join(resultsdir, 'n_nullify_rat')):
+        # debug here
+        cohfreqfile = glob.glob(resultsdir + '/coh_avg_*.png')
+        if len(cohfreqfile)>0:
+            cohfreqfile = cohfreqfile[0]
+            cohfreq = cohfreqfile.split('_')[-1].split('.')[0] #str
+            names = [ 'n_unw', 'coh_avg', 'coh_avg_'+cohfreq, 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_nullify_rat',
+                     'resid_rms']  ## noise indices
+            gt_lt = ['lt', 'lt', 'lt', 'lt', 'gt', 'gt', 'gt', 'gt', 'gt']  ## > or <
+            units = ['', '', '', 'yr', '', 'mm', '', '', 'mm']
+        else:
+            names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_nullify_rat',
+                     'resid_rms']  ## noise indices
+            gt_lt = ['lt', 'lt', 'gt', 'lt', 'gt', 'gt', 'gt', 'gt', 'gt']  ## > or <
+            units = ['', '', 'mm/yr', 'yr', '', 'mm', '', '', 'mm']
+    elif os.path.exists(os.path.join(resultsdir, 'n_nullify')):
+        # temporary for the 'version inbetween'
+        names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_nullify',
+                 'resid_rms']  ## noise indices
+        gt_lt = ['lt', 'lt', 'gt', 'lt', 'gt', 'gt', 'gt', 'gt', 'gt']  ## > or <
+        units = ['', '', 'mm/yr', 'yr', '', 'mm', '', '', 'mm']
     else:
-        names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err', 'resid_rms'] ## noise indices
-        # TODO: coh_mindays/lt (instead of vstd as: ['n_unw', 'coh_avg', 'coh_mindays', ...])
-    gt_lt = ['lt', 'lt', 'gt', 'lt', 'gt', 'gt', 'gt', 'gt', 'gt'] ## > or <
-    ## gt: greater values than thre are masked 
-    ## lt: more little values than thre are masked (coh_avg, n_unw, maxTlen)
-
-    units = ['', '', 'mm/yr', 'yr', '', 'mm', '', '', 'mm']
-
+        # orig figure
+        #names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err_rat', 'resid_rms'] # TODO: set n_loop_err_rat instead for masking!
+        names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err', 'resid_rms']
+        gt_lt = ['lt', 'lt', 'gt', 'lt', 'gt', 'gt', 'gt', 'gt', 'gt']  ## > or <
+        ## gt: greater values than thre are masked
+        ## lt: more little values than thre are masked (coh_avg, n_unw, maxTlen)
+        units = ['', '', 'mm/yr', 'yr', '', 'mm', '', '', 'mm']
 
     ### Get size and ref
     width = int(io_lib.get_param_par(inparmfile, 'range_samples'))
