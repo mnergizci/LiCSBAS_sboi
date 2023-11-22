@@ -41,6 +41,7 @@ LiCSBAS15_mask_ts.py -t tsadir [-c coh_thre] [-u n_unw_r_thre] [-v vstd_thre]
  -i  Threshold of n_ifg_noloop (number of ifgs with no loop)
  -l  Threshold of n_loop_err (number of loop_err) - in case of nullification in step 12, this will apply the threshold on n_nullify
  NOTE: we now test and will update the -l parameter to be a ratio (<=1 where 1 means all bad). Future: default: 0.9
+ -L temporary solution before we switch -l to the ratio
  -r  Threshold of resid_rms (RMS of residuals in inversion (mm))
  --v[min|max]  Min|Max value for output figure of velocity (Default: auto)
  --keep_isolated  Keep (not mask) isolated pixels
@@ -147,7 +148,7 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "ht:c:u:v:g:i:l:r:T:s:", ["version", "help", "vmin=", "vmax=", "use_coh_freq", "keep_isolated", "noautoadjust"])
+            opts, args = getopt.getopt(argv[1:], "ht:c:u:v:g:i:l:L:r:T:s:", ["version", "help", "vmin=", "vmax=", "use_coh_freq", "keep_isolated", "noautoadjust"])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -172,7 +173,9 @@ def main(argv=None):
                 thre_dict['n_ifg_noloop'] = int(a)
             elif o == '-l':
                 thre_dict['n_loop_err'] = int(a)   # TODO: after checking use of the ratio, remove this param and use the ratio only (below)
-                #thre_dict['n_loop_err_rat'] = float(a)
+            elif o == '-L'
+                thre_dict['n_loop_err_rat'] = float(a)
+                thre_dict['n_nullify_rat'] = float(a)
             elif o == '-r':
                 thre_dict['resid_rms'] = float(a)
             elif o == '--vmin':
