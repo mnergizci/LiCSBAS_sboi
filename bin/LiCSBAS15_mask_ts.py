@@ -173,7 +173,7 @@ def main(argv=None):
                 thre_dict['n_ifg_noloop'] = int(a)
             elif o == '-l':
                 thre_dict['n_loop_err'] = int(a)   # TODO: after checking use of the ratio, remove this param and use the ratio only (below)
-            elif o == '-L'
+            elif o == '-L':
                 thre_dict['n_loop_err_rat'] = float(a)
                 thre_dict['n_nullify_rat'] = float(a)
             elif o == '-r':
