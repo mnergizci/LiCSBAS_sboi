@@ -324,13 +324,17 @@ def main(argv=None):
 
     # replace .unw with .unw.ori OR REVERSE
     if save_ori_unw:
-        print('Saving original ifg files')
+        print('Saving original ifg files') # this will be done through the nullification function itself
+        '''
         for ifgd in ifgdates:
             unwfile_ori = os.path.join(ifgdir, ifgd, ifgd + '.unw.ori')
             unwfile = os.path.join(ifgdir, ifgd, ifgd + '.unw')
-            unw = io_lib.read_img(unwfile, length, width)
-            unw.tofile(unwfile_ori)
-
+            if not os.path.exists(unwfile_ori):
+                rc = shutil.move(unwfile, unwfile_ori)
+            ### if ori already exists, we should not modify it!
+            #unw = io_lib.read_img(unwfile, length, width)
+            #unw.tofile(unwfile_ori)
+        '''
     ### Parallel processing
     p = q.Pool(_n_para)
     loop_ph_rms_ifg = np.array(p.map(loop_closure_1st_wrapper, range(n_loop)), dtype=np.float32)
@@ -384,6 +388,9 @@ def main(argv=None):
             continue
 
         unwfile = os.path.join(ifgdir, ifgd, ifgd + '.unw')
+        unwfile_ori = os.path.join(ifgdir, ifgd, ifgd + '.unw.ori')
+        if os.path.exists(unwfile_ori):
+            unwfile = unwfile_ori
         unw = io_lib.read_img(unwfile, length, width)
 
         unw[unw == 0] = np.nan  # Fill 0 with nan
@@ -533,6 +540,9 @@ def main(argv=None):
             continue
 
         unwfile = os.path.join(ifgdir, ifgd, ifgd + '.unw')
+        unwfile_ori = os.path.join(ifgdir, ifgd, ifgd + '.unw.ori')
+        if os.path.exists(unwfile_ori):
+            unwfile = unwfile_ori
         unw_ref = io_lib.read_img(unwfile, length, width)[refy1:refy2, refx1:refx2]
 
         unw_ref[unw_ref == 0] = np.nan  # Fill 0 with nan
@@ -738,7 +748,10 @@ def main(argv=None):
             coh_avg_freq += coh
             n_coh_freq += (coh != 0)
         ii = ii + 1
-        unwfile = os.path.join(ifgdir, ifgd, ifgd+'.unw')
+        unwfile = os.path.join(ifgdir, ifgd, ifgd+'.unw') # after nullification
+        #unwfile_ori = os.path.join(ifgdir, ifgd, ifgd + '.unw.ori')
+        #if os.path.exists(unwfile_ori):
+        #    unwfile = unwfile_ori
         unw = io_lib.read_img(unwfile, length, width)
         unw[unw == 0] = np.nan # Fill 0 with nan
         n_unw += ~np.isnan(unw) # Summing number of unnan unw
@@ -1240,11 +1253,19 @@ def loop_closure_4th(args, da):
 
 def nullify_unw(ifgd, mask):
     unwfile = os.path.join(ifgdir, ifgd, ifgd + '.unw')
+    unwfile_ori = os.path.join(ifgdir, ifgd, ifgd + '.unw.ori')
+    if os.path.exists(unwfile_ori):
+        unwfile = unwfile_ori # this one is to be read for nullification
+    elif save_ori_unw:
+        # copy to ori for backup
+        shutil.copy(unwfile, unwfile_ori)
+        if os.path.exists(unwfile+'.png'):
+            shutil.copy(unwfile+'.png', unwfile_ori+'.png')
     if os.path.exists(unwfile):
         unw = io_lib.read_img(unwfile, length, width)
         # unw[mask==False]=0  # should be ok but it appears as 0 in preview...
         unw[mask == False] = np.nan
-        unw.tofile(unwfile)
+        unw.tofile(os.path.join(ifgdir, ifgd, ifgd + '.unw'))
 
 
 # %% main
