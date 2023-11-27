@@ -639,9 +639,10 @@ def main(argv=None):
     # p.close()
     # dataarray is not updated through parallel processing. avoiding parallelisation now
     ns_loop_err, da = loop_closure_4th([0, len(Aloop)], da)
-    n_nullify = np.zeros((length, width), dtype=np.float32)
+    n_nullify = None
     # ns_loop_err = np.sum(res[:, :, :,], axis=0)
     if nullify:
+        n_nullify = np.zeros((length, width), dtype=np.float32)
         print('nullifying unws with loop errors - not parallel now')
         for ifgd in ifgdates:
             mask = da.loc[:, :, ifgd].values
@@ -784,14 +785,15 @@ def main(argv=None):
     n_loop_err_rat_file = os.path.join(resultsdir, 'n_loop_err_rat')
     np.float32(ns_loop_err_rat).tofile(n_loop_err_rat_file)
 
-    # if save_ori_unw:   #ML: saving always
-    n_nullify_file = os.path.join(resultsdir, 'n_nullify')
-    np.float32(n_nullify).tofile(n_nullify_file)
-
-    # ML: store ratio (is similar to ns_loop_err_rat?)
-    n_nullify_rat = n_nullify/(n_unw - len(no_loop_ifg))
-    n_nullify_rat_file = os.path.join(resultsdir, 'n_nullify_rat')
-    np.float32(n_nullify_rat).tofile(n_nullify_rat_file)
+    if n_nullify is not None:
+        # if save_ori_unw:   #ML: saving always
+        n_nullify_file = os.path.join(resultsdir, 'n_nullify')
+        np.float32(n_nullify).tofile(n_nullify_file)
+        #
+        # ML: store ratio (is similar to ns_loop_err_rat?)
+        n_nullify_rat = n_nullify/(n_unw - len(no_loop_ifg))
+        n_nullify_rat_file = os.path.join(resultsdir, 'n_nullify_rat')
+        np.float32(n_nullify_rat).tofile(n_nullify_rat_file)
 
     ### Save png
     title = 'Average coherence'
@@ -809,12 +811,12 @@ def main(argv=None):
     title = 'Ratio of unclosed loops vs all triplets'
     plot_lib.make_im_png(ns_loop_err_rat, n_loop_err_rat_file + '.png', cmap_noise_r, title)
 
-    # if save_ori_unw:
-    title = 'Number of nullified ifgs'
-    plot_lib.make_im_png(n_nullify, n_nullify_file + '.png', cmap_noise_r, title)
-
-    title = 'Ratio of nullified pixels in unw data with loops'
-    plot_lib.make_im_png(n_nullify_rat, n_nullify_rat_file + '.png', cmap_noise_r, title)
+    if n_nullify is not None:
+        title = 'Number of nullified ifgs'
+        plot_lib.make_im_png(n_nullify, n_nullify_file + '.png', cmap_noise_r, title)
+        #
+        title = 'Ratio of nullified pixels in unw data with loops'
+        plot_lib.make_im_png(n_nullify_rat, n_nullify_rat_file + '.png', cmap_noise_r, title)
 
     # %% Link ras
     ### First, identify suffix of raster image (ras, bmp, or png?)
