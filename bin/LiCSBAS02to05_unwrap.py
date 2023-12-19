@@ -47,6 +47,7 @@ LiCSBAS02to05_unwrap.py -i WORKdir [-M nlook] [-g lon1/lon2/lat1/lat2] [--gacos]
  --hgtcorr Apply height-correlation correction (default: not apply). Note this will be turned off if GACOS is to be used.
  --cascade  Apply cascade unwrapping approach: 1 cascade with 10xML layer (recommended)
  --cascade_full Apply full cascade unwrapping approach: 3 cascade steps through 10-5-3xML layers (experimental)
+ --smooth  Use Gaussian smoothing of filtered interferograms instead of the Goldstein filter to support unwrapping. Faster solution, might provide better mask.
  --thres <float> Threshold value for masking noise based on consistence (Default: 0.3)
  --freq <float>   Radar frequency in Hz (Default: 5.405e9 for Sentinel-1)
            (e.g., 1.27e9 for ALOS, 1.2575e9 for ALOS-2/U, 1.2365e9 for ALOS-2/{F,W})
@@ -114,7 +115,8 @@ def main(argv=None):
     hgtcorr = False
     gacoscorr = False
     do_landmask = True
-    
+    smoothfilt = False
+
     try:
         nproc = len(os.sched_getaffinity(0))
     except:
@@ -123,7 +125,7 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hi:g:M:", ["help", "gacos", "hgtcorr", "cascade", "cascade_full", "nolandmask", "thres=", "freq=", "n_para="])
+            opts, args = getopt.getopt(argv[1:], "hi:g:M:", ["help", "gacos", "hgtcorr", "cascade", "cascade_full", "smooth","nolandmask", "thres=", "freq=", "n_para="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -138,6 +140,8 @@ def main(argv=None):
                 cliparea_geo = a
             elif o == '--gacos':
                 gacoscorr = True
+            elif o =='--smooth':
+                smoothfilt = True
             elif o == '--hgtcorr':
                 hgtcorr = True
             elif o == '--nolandmask':
@@ -189,9 +193,11 @@ def main(argv=None):
     unw.process_frame(ml = ml, thres = thres, cliparea_geo = cliparea_geo, 
                 cascade=cascade, only10 = only10,
                 hgtcorr = hgtcorr, gacoscorr = gacoscorr,
-                nproc = nproc, freq=freq, 
+                nproc = nproc, freq=freq,
+                # if smooth, combine with filtered ifgs
+                goldstein = not smoothfilt, smooth = smoothfilt, prefer_unfiltered = not smoothfilt,
                 # keeping the 'not-to-be-changed'defaults:
-                goldstein = True, smooth = False, lowpass = False, defomax = 0.3, dolocal = True, frame = 'dummy', specmag = True, 
+                lowpass = False, defomax = 0.3, dolocal = True, frame = 'dummy', specmag = True,
                 pairsetfile = None, subtract_gacos = True, export_to_tif = False,
                 keep_coh_debug = True, use_amp_coh = False, use_coh_stab = False, use_amp_stab = False, gacosdir = '../GACOS', do_landmask = do_landmask)
     
