@@ -58,7 +58,7 @@ LiCSBAS15_mask_ts.py -t tsadir [-c coh_thre] [-u n_unw_r_thre] [-v vstd_thre]
 #%% Change log
 '''
 20231121 ML, UoL
- - use of n_nullify (with -l) and ratios of both loop_err and n_nullify (should be better, will move to this, but now TO_CHECK status
+ - use of n_nullify (with -l) and ratios of both loop_err and n_nullify with -L (should be better, will move to this, but now TO_CHECK status
 v1.8.2 20211129 Milan Lazecky, Uni of Leeds
  - Change default -i as global number of no_loop_ifgs + 1
 v1.8.1 20200911 Yu Morishita, GSI
@@ -175,7 +175,7 @@ def main(argv=None):
                 thre_dict['n_loop_err'] = int(a)   # TODO: after checking use of the ratio, remove this param and use the ratio only (below)
             elif o == '-L':
                 thre_dict['n_loop_err_rat'] = float(a)
-                thre_dict['n_nullify_rat'] = float(a)
+                #thre_dict['n_nullify_rat'] = float(a)  # 2024/01: n_loop_err_Rat is now before nullification
             elif o == '-r':
                 thre_dict['resid_rms'] = float(a)
             elif o == '--vmin':
@@ -219,7 +219,7 @@ def main(argv=None):
     #else:
     #    names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err', 'resid_rms'] ## noise indices
     #    # TODO: coh_mindays/lt (instead of vstd as: ['n_unw', 'coh_avg', 'coh_mindays', ...])
-
+    '''
     if os.path.exists(os.path.join(resultsdir, 'n_nullify_rat')):
         # debug here
         cohfreqfile = glob.glob(resultsdir + '/coh_avg_*.png')
@@ -251,11 +251,13 @@ def main(argv=None):
     else:
         # orig figure
         #names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err_rat', 'resid_rms'] # TODO: set n_loop_err_rat instead for masking!
-        names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err', 'resid_rms']
-        gt_lt = ['lt', 'lt', 'gt', 'lt', 'gt', 'gt', 'gt', 'gt', 'gt']  ## > or <
-        ## gt: greater values than thre are masked
-        ## lt: more little values than thre are masked (coh_avg, n_unw, maxTlen)
-        units = ['', '', 'mm/yr', 'yr', '', 'mm', '', '', 'mm']
+    '''
+    print('WARNING, 2024/01 change in DEV branch - n_loop_err_ratio is used (before nullification if done)')
+    names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err', 'resid_rms']
+    gt_lt = ['lt', 'lt', 'gt', 'lt', 'gt', 'gt', 'gt', 'gt', 'gt']  ## > or <
+    ## gt: greater values than thre are masked
+    ## lt: more little values than thre are masked (coh_avg, n_unw, maxTlen)
+    units = ['', '', 'mm/yr', 'yr', '', 'mm', '', '', 'mm']
 
     ### Get size and ref
     width = int(io_lib.get_param_par(inparmfile, 'range_samples'))

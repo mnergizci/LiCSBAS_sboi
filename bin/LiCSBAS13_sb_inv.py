@@ -302,6 +302,11 @@ def main(argv=None):
         reffile = os.path.join(infodir, '12ref.txt')
     if not os.path.exists(reffile): ## for old LiCSBAS12 < v1.1
         reffile = os.path.join(infodir, 'ref.txt')
+    #if not os.path.exists(reffile):
+    #    print('You did not run step 12! This is strongly recommended to do. Proceeding further but expect lower quality results.')
+    #    os.system('echo "0:0/0:0" > {0}'.format(reffile))
+    #    if not os.path.exists(bad_ifg12file):
+    #        os.system('touch {0}'.format(bad_ifg12file))
 
     incdir = os.path.join(tsadir,'13increment')
     if not os.path.exists(incdir): os.mkdir(incdir)

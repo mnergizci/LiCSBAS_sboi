@@ -41,7 +41,6 @@ with warnings.catch_warnings(): ## To silence user warning
     mpl.use('Agg')
 from matplotlib import pyplot as plt
 
-
 #%%
 def make_loop_matrix(ifgdates):
     """

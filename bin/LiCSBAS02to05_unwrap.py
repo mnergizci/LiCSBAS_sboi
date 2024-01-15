@@ -73,6 +73,14 @@ import sys
 import time
 import numpy as np
 import multiprocessing as multi
+
+# but should cancel if there is no snaphu installed
+if os.system('which snaphu >/dev/null 2>/dev/null') != 0:
+    print('snaphu not detected. please install it yourself, e.g. from:')
+    print('https://web.stanford.edu/group/radar/softwareandlinks/sw/snaphu')
+    exit()
+
+
 try:
     import lics_unwrap as unw
 except:

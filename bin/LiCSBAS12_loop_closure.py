@@ -651,7 +651,11 @@ def main(argv=None):
                 n_nullify = n_nullify + np.multiply(np.logical_not(np.array(mask)), 1)
                 nullify_unw(ifgd, mask)
         # recalculating ns_loop_err to be after nullification (long but... ok for now)
-        ns_loop_err, da = loop_closure_4th([0, len(Aloop)], da)
+        print('debug 2024/01: keeping n_loop_err from before nullification')
+        #ns_loop_err, da = loop_closure_4th([0, len(Aloop)], da)
+
+
+
     # generate loop pngs:
     if do_pngs:
         ### Parallel processing
@@ -805,10 +809,14 @@ def main(argv=None):
     title = 'Number of used unw data'
     plot_lib.make_im_png(n_unw, n_unwfile + '.png', cmap_noise, title, n_im)
 
-    title = 'Number of unclosed loops'
+    if nullify:
+        strnul = ' (before nullification)'
+    else:
+        strnul = ''
+    title = 'Number of unclosed loops'+strnul
     plot_lib.make_im_png(ns_loop_err, n_loop_errfile + '.png', cmap_noise_r, title)
 
-    title = 'Ratio of unclosed loops vs all triplets'
+    title = 'Ratio of unclosed loops vs all triplets'+strnul
     plot_lib.make_im_png(ns_loop_err_rat, n_loop_err_rat_file + '.png', cmap_noise_r, title)
 
     if n_nullify is not None:
