@@ -651,7 +651,7 @@ def main(argv=None):
                 n_nullify = n_nullify + np.multiply(np.logical_not(np.array(mask)), 1)
                 nullify_unw(ifgd, mask)
         # recalculating ns_loop_err to be after nullification (long but... ok for now)
-        print('debug 2024/01: keeping n_loop_err from before nullification')
+        #print('debug 2024/01: keeping n_loop_err from before nullification')
         #ns_loop_err, da = loop_closure_4th([0, len(Aloop)], da)
 
 
