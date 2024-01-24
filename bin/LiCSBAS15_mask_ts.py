@@ -12,7 +12,7 @@ Input & output files
 Inputs in TS_GEOCml*/ :
  - results/[vel, coh_avg, n_unw, vstd, maxTlen, n_gap, stc,
             n_ifg_noloop, n_loop_err, resid_rms, n_nullify
-            coh_avg_XX, n_nullify_rat, n_loop_err_rat]
+            coh_avg_XX, n_loop_err_rat]
  - info/13parameters.txt
  
 Outputs in TS_GEOCml*/
@@ -40,7 +40,7 @@ LiCSBAS15_mask_ts.py -t tsadir [-c coh_thre] [-u n_unw_r_thre] [-v vstd_thre]
  -s  Threshold of stc (spatio-temporal consistency (mm))
  -i  Threshold of n_ifg_noloop (number of ifgs with no loop)
  -l  Threshold of n_loop_err (number of loop_err) - in case of nullification in step 12, this will apply the threshold on n_nullify
- NOTE: we now test and will update the -l parameter to be a ratio (<=1 where 1 means all bad). Future: default: 0.9
+ NOTE: we now test and will update the -l parameter to be a ratio (<=1 where 1 means all bad). Future: default: 0.7
  -L temporary solution before we switch -l to the ratio
  -r  Threshold of resid_rms (RMS of residuals in inversion (mm))
  --v[min|max]  Min|Max value for output figure of velocity (Default: auto)
@@ -253,7 +253,8 @@ def main(argv=None):
         #names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err_rat', 'resid_rms'] # TODO: set n_loop_err_rat instead for masking!
     '''
     print('WARNING, 2024/01 change in DEV branch - n_loop_err_ratio is used (before nullification if done)')
-    names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err', 'resid_rms']
+    #names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err', 'resid_rms']
+    names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err_rat', 'resid_rms']
     gt_lt = ['lt', 'lt', 'gt', 'lt', 'gt', 'gt', 'gt', 'gt', 'gt']  ## > or <
     ## gt: greater values than thre are masked
     ## lt: more little values than thre are masked (coh_avg, n_unw, maxTlen)
@@ -269,11 +270,10 @@ def main(argv=None):
     
     #%% Determine default thresholds depending on frequency band
     if not 'maxTlen' in thre_dict: thre_dict['maxTlen'] = 1
+    '''
     # 20231122 update:
     if (not 'n_nullify_rat' in thre_dict) and ('n_nullify_rat' in names):
         thre_dict['n_nullify_rat'] = 0.9
-    if (not 'n_loop_err_rat' in thre_dict) and ('n_loop_err_rat' in names):
-        thre_dict['n_loop_err_rat'] = 0.9
     if (not 'n_nullify' in thre_dict) and ('n_nullify' in names):
         if 'n_loop_err' in thre_dict:
             # if we used -l, we can use the same number for the n_nullify
@@ -284,6 +284,9 @@ def main(argv=None):
                     thre_dict['n_nullify'] = int((len(fp.readlines()) - 4)/3)   # set threshold as 'bad in all loops'
             except:
                 thre_dict['n_nullify'] = 1000
+    '''
+    if (not 'n_loop_err_rat' in thre_dict) and ('n_loop_err_rat' in names):
+        thre_dict['n_loop_err_rat'] = 0.7
     if not 'n_ifg_noloop' in thre_dict:
         try:
             thre_dict['n_ifg_noloop'] = len(os.listdir(os.path.join(tsadir, '12no_loop_ifg_ras')))+1
