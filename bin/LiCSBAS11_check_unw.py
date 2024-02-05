@@ -349,18 +349,20 @@ def main(argv=None):
     elif os.path.exists(unwfile+'.png'):
         suffix = '.png'
     else:
-        print('\nERROR: No browse image available for {}!\n'
+        suffix = ''
+        print('\nWARNING: No browse image available for {}\n'
               .format(unwfile), file=sys.stderr)
-        return 2
+        #return 2
 
     for i, ifgd in enumerate(ifgdates):
-        rasname = ifgdates[i]+'.unw'+suffix
-        rasorg = os.path.join(ifgdir, ifgdates[i], rasname)
+        if suffix:
+            rasname = ifgdates[i]+'.unw'+suffix
+            rasorg = os.path.join(ifgdir, ifgdates[i], rasname)
 
-        if not os.path.exists(rasorg):
-            print('\nERROR: No browse image {} available!\n'
-                  .format(rasorg), file=sys.stderr)
-            return 2
+            if not os.path.exists(rasorg):
+                print('\nERROR: No browse image {} available!\n'
+                      .format(rasorg), file=sys.stderr)
+                return 2
 
         ### Identify bad ifgs and link ras
         if rate_cov[i] < unw_cov_thre or coh_avg_ifg[i] < coh_thre or \
@@ -368,9 +370,11 @@ def main(argv=None):
             bad_ifgdates.append(ifgdates[i])
             ixs_bad_ifgdates.append(i)
             rm_flag = '*'
-            os.symlink(os.path.relpath(rasorg, bad_ifg_rasdir), os.path.join(bad_ifg_rasdir, rasname))
+            if suffix:
+                os.symlink(os.path.relpath(rasorg, bad_ifg_rasdir), os.path.join(bad_ifg_rasdir, rasname))
         else:
-            os.symlink(os.path.relpath(rasorg, ifg_rasdir), os.path.join(ifg_rasdir, rasname))
+            if suffix:
+                os.symlink(os.path.relpath(rasorg, ifg_rasdir), os.path.join(ifg_rasdir, rasname))
             rm_flag = ''
 
         ### For stats file

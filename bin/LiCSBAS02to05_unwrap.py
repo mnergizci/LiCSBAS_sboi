@@ -38,12 +38,12 @@ Outputs in GEOCmlX[GACOS][clip]:
 =====
 Usage
 =====
-LiCSBAS02to05_unwrap.py -i WORKdir [-M nlook] [-g lon1/lon2/lat1/lat2] [--filter gold|gauss|adf] [--gacos] [--hgtcorr] [--cascade/--cascade_full] [--thres float] [--freq float] [--n_para int] [...]
+LiCSBAS02to05_unwrap.py -i WORKdir [-M nlook] [-g lon1/lon2/lat1/lat2] [--filter gold|gauss|adf] [--gacos] [--hgtcorr] [--cascade/--cascade_full] [--thres float] [--freq float] [--n_para int] [--nolandmask]
 
  -i  <str> Path to the work directory (i.e. folder that contains the input GEOC dir with the stack of geotiff data, and optionally other dirs: GEOC.MLI, GACOS)
  -M  <int> Number of multilooking factor (Default: 10, 10x10 multilooking)
  -g  <str> Range to be clipped in geographical coordinates (deg), as lon1/lon2/lat1/lat2
- --filter  Spatial filter to support primary unwrapping and to estimate consistence (Default: Goldstein)
+ --filter <str>  Spatial filter to support primary unwrapping and to estimate consistence (Default: Goldstein)
    gold:   Adapted implementation of the Goldstein filter, consistence estimated as FFT spectral magnitude
    gauss:  A 2-D Gaussian kernel filter, consistence estimated based on filter residuals. Fast solution, not recommended for high phase gradients
    adf:    Use of ADF2 for the adaptive filter implemented by GAMMA software (if available), ADF-coherence applied as consistence
@@ -63,6 +63,8 @@ For more information about the procedure, see e.g. https://ieeexplore.ieee.org/d
 """
 #%% Change log
 '''
+vXX 20240205 ML
+ - 'almost' full lics_unwrap functionality (incl. ADF)
 v1.14.2 20230628 Milan Lazecky, UniLeeds
  - initial version using previously developed lics_unwrap functions
 '''
@@ -126,7 +128,7 @@ def main(argv=None):
     hgtcorr = False
     gacoscorr = False
     do_landmask = True
-    filter = 'gold'
+    spfilter = 'gold'
 
     try:
         nproc = len(os.sched_getaffinity(0))
@@ -152,7 +154,7 @@ def main(argv=None):
             elif o == '--gacos':
                 gacoscorr = True
             elif o =='--filter':
-                filter = a
+                spfilter = a
             elif o == '--hgtcorr':
                 hgtcorr = True
             elif o == '--nolandmask':
@@ -178,9 +180,9 @@ def main(argv=None):
             raise Usage('No GEOC dir exists in {}!'.format(workdir))
         if gacoscorr and not os.path.exists(os.path.join(workdir, 'GACOS')):
             raise Usage('No GACOS dir exists in {} but use of GACOS turned on!'.format(workdir))
-        if filter not in ['gold', 'gauss', 'adf']:
+        if spfilter not in ['gold', 'gauss', 'adf']:
             raise Usage("Wrong filtering option set - only 'gold', 'gauss', or 'adf' are available")
-        if filter == 'adf':
+        if spfilter == 'adf':
             # check for gamma commands
             if os.system('which adf2 >/dev/null 2>/dev/null') != 0:
                 raise Usage('ERROR: GAMMA SW not found, cancelling')
@@ -206,15 +208,15 @@ def main(argv=None):
         os.mkdir(outdir)
     os.chdir(outdir) # need to run the processing here..
     # about the filters
-    if filter == 'gauss':
+    if spfilter == 'gauss':
         goldstein = False
         use_gamma = False
         smooth = True
-    elif filter == 'gold':
+    elif spfilter == 'gold':
         goldstein = True
         use_gamma = False
         smooth = False
-    elif filter == 'adf':
+    elif spfilter == 'adf':
         goldstein = True
         use_gamma = True
         smooth = False
