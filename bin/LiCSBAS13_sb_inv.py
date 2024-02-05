@@ -75,7 +75,7 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] 
  --keep_incfile
      Not remove inc and resid files (Default: remove them)
  --gpu        Use GPU (Need cupy module)
- --singular       Use more economic (unconstrained SBAS) computation (faster and less demanding solution, but considered less precise)
+ --singular   Use more economic (unconstrained SBAS) computation (faster and less demanding solution, but considered less precise)
  --only_sb    Perform only SB processing (skipping points with NaNs)
  --nopngs     Avoid generating some (unnecessary) PNG previews of increment residuals etc.
  --no_storepatches Don't store completed patch data [default: store patches in case of job timeout]
@@ -271,6 +271,10 @@ def main(argv=None):
             import cupy as cp
         if input_units not in ['rad', 'mm', 'm']:
             raise Usage("Wrong units of the input data - available options are: rad, mm, m.")
+        if inv_alg not in ['LS', 'WLS']:
+            raise Usage("Wrong inversion algorithm - only LS or WLS are the options here")
+        if (inv_alg != 'WLS') and (singular == True):
+            raise Usage('Sorry, --singular works only with LS but you requested WLS as inversion algorithm.')
 
     except Usage as err:
         print("\nERROR:", file=sys.stderr, end='')

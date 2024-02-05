@@ -1270,13 +1270,17 @@ def nullify_unw(ifgd, mask):
         # copy to ori for backup
         shutil.copy(unwfile, unwfile_ori)
         if os.path.exists(unwfile+'.png'):
-            shutil.copy(unwfile+'.png', unwfile_ori+'.png')
+            shutil.move(unwfile+'.png', unwfile_ori+'.png')
     if os.path.exists(unwfile):
         unw = io_lib.read_img(unwfile, length, width)
         # unw[mask==False]=0  # should be ok but it appears as 0 in preview...
         unw[mask == False] = np.nan
         unw.tofile(os.path.join(ifgdir, ifgd, ifgd + '.unw'))
-
+        # here we nullified based on the mask, now let's generate preview as well
+        #unwpngfile = unwfile + '.png'
+        # but we would need to also have cmap_wrap, so... maybe later
+        #plot_lib.make_im_png(np.angle(np.exp(1j * unw / cycle) * cycle), unwpngfile, cmap_wrap, unwfile,
+        #                     vmin=-np.pi, vmax=np.pi, cbar=False)
 
 # %% main
 if __name__ == "__main__":

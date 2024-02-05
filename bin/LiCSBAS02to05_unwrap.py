@@ -38,16 +38,19 @@ Outputs in GEOCmlX[GACOS][clip]:
 =====
 Usage
 =====
-LiCSBAS02to05_unwrap.py -i WORKdir [-M nlook] [-g lon1/lon2/lat1/lat2] [--gacos] [--hgtcorr] [--cascade/--cascade_full] [--thres float] [--freq float] [--n_para int]
+LiCSBAS02to05_unwrap.py -i WORKdir [-M nlook] [-g lon1/lon2/lat1/lat2] [--filter gold|gauss|adf] [--gacos] [--hgtcorr] [--cascade/--cascade_full] [--thres float] [--freq float] [--n_para int] [...]
 
  -i  <str> Path to the work directory (i.e. folder that contains the input GEOC dir with the stack of geotiff data, and optionally other dirs: GEOC.MLI, GACOS)
  -M  <int> Number of multilooking factor (Default: 10, 10x10 multilooking)
  -g  <str> Range to be clipped in geographical coordinates (deg), as lon1/lon2/lat1/lat2
+ --filter  Spatial filter to support primary unwrapping and to estimate consistence (Default: Goldstein)
+   gold:   Adapted implementation of the Goldstein filter, consistence estimated as FFT spectral magnitude
+   gauss:  A 2-D Gaussian kernel filter, consistence estimated based on filter residuals. Fast solution, not recommended for high phase gradients
+   adf:    Use of ADF2 for the adaptive filter implemented by GAMMA software (if available), ADF-coherence applied as consistence
  --gacos   Use GACOS data (recommended, expects GACOS folder - see LiCSBAS_01_get_geotiff.py). Note this will limit dataset to epochs with GACOS correction.
  --hgtcorr Apply height-correlation correction (default: not apply). Note this will be turned off if GACOS is to be used.
  --cascade  Apply cascade unwrapping approach: 1 cascade with 10xML layer (recommended)
  --cascade_full Apply full cascade unwrapping approach: 3 cascade steps through 10-5-3xML layers (experimental)
- --smooth  Use Gaussian smoothing of filtered interferograms instead of the Goldstein filter to support unwrapping. Faster solution, might provide better mask.
  --thres <float> Threshold value for masking noise based on consistence (Default: 0.3)
  --freq <float>   Radar frequency in Hz (Default: 5.405e9 for Sentinel-1)
            (e.g., 1.27e9 for ALOS, 1.2575e9 for ALOS-2/U, 1.2365e9 for ALOS-2/{F,W})
@@ -123,7 +126,7 @@ def main(argv=None):
     hgtcorr = False
     gacoscorr = False
     do_landmask = True
-    smoothfilt = False
+    filter = 'gold'
 
     try:
         nproc = len(os.sched_getaffinity(0))
@@ -133,7 +136,7 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hi:g:M:", ["help", "gacos", "hgtcorr", "cascade", "cascade_full", "smooth","nolandmask", "thres=", "freq=", "n_para="])
+            opts, args = getopt.getopt(argv[1:], "hi:g:M:", ["help", "gacos", "hgtcorr", "cascade", "cascade_full", "filter=","nolandmask", "thres=", "freq=", "n_para="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -148,8 +151,8 @@ def main(argv=None):
                 cliparea_geo = a
             elif o == '--gacos':
                 gacoscorr = True
-            elif o =='--smooth':
-                smoothfilt = True
+            elif o =='--filter':
+                filter = a
             elif o == '--hgtcorr':
                 hgtcorr = True
             elif o == '--nolandmask':
@@ -175,7 +178,12 @@ def main(argv=None):
             raise Usage('No GEOC dir exists in {}!'.format(workdir))
         if gacoscorr and not os.path.exists(os.path.join(workdir, 'GACOS')):
             raise Usage('No GACOS dir exists in {} but use of GACOS turned on!'.format(workdir))
-    
+        if filter not in ['gold', 'gauss', 'adf']:
+            raise Usage("Wrong filtering option set - only 'gold', 'gauss', or 'adf' are available")
+        if filter == 'adf':
+            # check for gamma commands
+            if os.system('which adf2 >/dev/null 2>/dev/null') != 0:
+                raise Usage('ERROR: GAMMA SW not found, cancelling')
     except Usage as err:
         print("\nERROR:", file=sys.stderr, end='')
         print("  "+str(err.msg), file=sys.stderr)
@@ -197,13 +205,27 @@ def main(argv=None):
     if not os.path.exists(outdir):
         os.mkdir(outdir)
     os.chdir(outdir) # need to run the processing here..
+    # about the filters
+    if filter == 'gauss':
+        goldstein = False
+        use_gamma = False
+        smooth = True
+    elif filter == 'gold':
+        goldstein = True
+        use_gamma = False
+        smooth = False
+    elif filter == 'adf':
+        goldstein = True
+        use_gamma = True
+        smooth = False
     print('Running unwrapping using given parameters')
     unw.process_frame(ml = ml, thres = thres, cliparea_geo = cliparea_geo, 
                 cascade=cascade, only10 = only10,
                 hgtcorr = hgtcorr, gacoscorr = gacoscorr,
                 nproc = nproc, freq=freq,
                 # if smooth, combine with filtered ifgs
-                goldstein = not smoothfilt, smooth = smoothfilt, prefer_unfiltered = not smoothfilt,
+                goldstein = goldstein, smooth = smooth, use_gamma = use_gamma,
+                prefer_unfiltered = True, # UNFILTERED SEEM ALWAYS BETTER!!! # TODO ?
                 # keeping the 'not-to-be-changed'defaults:
                 lowpass = False, defomax = 0.3, dolocal = True, frame = 'dummy', specmag = True,
                 pairsetfile = None, subtract_gacos = True, export_to_tif = False,

@@ -50,6 +50,7 @@ p02to05_freq=$freq # default: 5.405e9 Hz
 p02to05_gacos="" # y/n. default: 'y'. Use gacos data if available (for majority of epochs, data without GACOS corr would be dropped)
 p02to05_hgtcorr="" # y/n. default: 'n'. Recommended for regions with high and varying topography
 p02to05_cascade="" # y/n. default: 'n'. Cascade from higher multilook factor would propagate to higher resolution (lower ML factor) data. Useful but not universal
+p02to05_filter="" # gold, gauss or adf. Default: 'gold'
 p02to05_thres="" # default: 0.35. Spatial consistence of the interferogram. Recommended to keep this value. If too much is masked, may try getting close to 0 (although, this would introduce some unw errors)
 p02to05_cliparea_geo=$p05_clip_range_geo # setting the clip range, e.g. 130.11/131.12/34.34/34.6 (in deg)
 p02to05_n_para=$n_para
@@ -180,6 +181,7 @@ if [ $skipstep02 -eq 1 ]; then
   if [ ! -z $p02to05_freq ];then p02to05_op="$p02to05_op --freq $p02to05_freq"; fi
   if [ ! -z $p02to05_n_para ];then p02to05_op="$p02to05_op --n_para $p02to05_n_para"; fi
   if [ ! -z $p02to05_thres ];then p02to05_op="$p02to05_op --thres $p02to05_thres"; fi
+  if [ ! -z $p02to05_filter ];then p02to05_op="$p02to05_op --filter $p02to05_filter"; fi
   if [ ! -z $p02to05_cliparea_geo ];then p02to05_op="$p02to05_op -g $p02to05_cliparea_geo"; fi
   if [ $p02to05_cascade == "y" ];then p02to05_op="$p02to05_op --cascade"; fi
   if [ $p02to05_hgtcorr == "y" ];then p02to05_op="$p02to05_op --hgtcorr"; fi
