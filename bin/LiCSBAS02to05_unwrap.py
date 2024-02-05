@@ -11,6 +11,7 @@ Inputs:
  - GEOC/    
    - yyyymmdd_yyyymmdd/
      - yyyymmdd_yyyymmdd.geo.diff_unfiltered_pha.tif
+    [- yyyymmdd_yyyymmdd.geo.diff_pha.tif]
      - yyyymmdd_yyyymmdd.geo.cc.tif
   [- *.geo.mli.tif]
   [- *.geo.hgt.tif]
