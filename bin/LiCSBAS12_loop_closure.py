@@ -835,22 +835,25 @@ def main(argv=None):
         suffix = '.bmp'
     elif os.path.exists(unwfile + '.png'):
         suffix = '.png'
-
-    for ifgd in ifgdates:
-        rasname = ifgd + '.unw' + suffix
-        rasorg = os.path.join(ifgdir, ifgd, rasname)
-        ### Bad ifgs
-        if ifgd in bad_ifg_all:
-            os.symlink(os.path.relpath(rasorg, bad_ifgrasdir), os.path.join(bad_ifgrasdir, rasname))
-        ### Remaining bad ifg candidates
-        elif ifgd in bad_ifg_cand_res:
-            os.symlink(os.path.relpath(rasorg, bad_ifg_candrasdir), os.path.join(bad_ifg_candrasdir, rasname))
-        ### Good ifgs
-        else:
-            os.symlink(os.path.relpath(rasorg, ifg_rasdir), os.path.join(ifg_rasdir, rasname))
-
-        if ifgd in no_loop_ifg:
-            os.symlink(os.path.relpath(rasorg, no_loop_ifgrasdir), os.path.join(no_loop_ifgrasdir, rasname))
+    elif os.path.exists(unwfile + '.jpg'):
+        suffix = '.jpg'
+    else:
+        suffix = ''
+    if suffix:
+        for ifgd in ifgdates:
+            rasname = ifgd + '.unw' + suffix
+            rasorg = os.path.join(ifgdir, ifgd, rasname)
+            ### Bad ifgs
+            if ifgd in bad_ifg_all:
+                os.symlink(os.path.relpath(rasorg, bad_ifgrasdir), os.path.join(bad_ifgrasdir, rasname))
+            ### Remaining bad ifg candidates
+            elif ifgd in bad_ifg_cand_res:
+                os.symlink(os.path.relpath(rasorg, bad_ifg_candrasdir), os.path.join(bad_ifg_candrasdir, rasname))
+            ### Good ifgs
+            else:
+                os.symlink(os.path.relpath(rasorg, ifg_rasdir), os.path.join(ifg_rasdir, rasname))
+            if ifgd in no_loop_ifg:
+                os.symlink(os.path.relpath(rasorg, no_loop_ifgrasdir), os.path.join(no_loop_ifgrasdir, rasname))
 
     # %% Plot network
     ## Read bperp data or dummy
