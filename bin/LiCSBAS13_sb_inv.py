@@ -82,7 +82,7 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] 
  --load_patches Load previously completed patches first [default: No, restart inversion]
  --input_units Units of the input data. Possible values: ['rad', 'mm', 'm']. Default: rad
  --nullify_noloops   Nullifies data from ifgs not included in any loop BEFORE NULLIFICATION (if happened)
- --nullify_noloops_use_data_before_nullification  Just to test, will probably remove this
+ --nullify_noloops_use_data_after_nullification  Just to test, will probably remove this
 """
 #%% Change log
 '''
@@ -192,8 +192,8 @@ def main(argv=None):
     input_units = 'rad'
     nullify_noloops = True #False
     print('NOTE, keeping nullify_noloops ON by default, for testing..')
-    nullify_noloops_use_data_before_nullification = False
-    #print('NOTE, variable nullify_noloops_use_data_before_nullification set to False - testing')
+    nullify_noloops_use_data_after_nullification = False
+    print('NOTE, variable nullify_noloops_use_data_after_nullification set to False - testing')
 
     try:
         n_para = len(os.sched_getaffinity(0))
@@ -224,7 +224,7 @@ def main(argv=None):
         try:
             opts, args = getopt.getopt(argv[1:], "hd:t:",
                                        ["help",  "mem_size=", "input_units=", "gamma=",
-                                        "n_unw_r_thre=", "keep_incfile", "nopngs", "nullify_noloops", "nullify_noloops_use_data_before_nullification",
+                                        "n_unw_r_thre=", "keep_incfile", "nopngs", "nullify_noloops", "nullify_noloops_use_data_after_nullification",
                                         "inv_alg=", "n_para=", "gpu", "singular", "only_sb", "no_storepatches", "load_patches"])
         except getopt.error as msg:
             raise Usage(msg)
@@ -260,8 +260,8 @@ def main(argv=None):
                 nopngs = True
             elif o == '--nullify_noloops':
                 nullify_noloops = True
-            elif o == '--nullify_noloops_use_data_before_nullification':
-                nullify_noloops_use_data_before_nullification = True
+            elif o == '--nullify_noloops_use_data_after_nullification':
+                nullify_noloops_use_data_after_nullification = True
             elif o == '--no_storepatches':
                 store_patches = False
             elif o == '--load_patches':
@@ -710,7 +710,7 @@ def main(argv=None):
             unwpatch = unwpatch.reshape((n_ifg, n_pt_all)).transpose() #(n_pt_all, n_ifg)
 
             ### Recalculate no-loop ifgs info to remove them - use only the 'ori files', i.e. before nullification. If no ori, we'll use the unw files (then unwpatch_ori = unwpatch)
-            if nullify_noloops and nullify_noloops_use_data_before_nullification:
+            if nullify_noloops and not nullify_noloops_use_data_after_nullification:
                 try:
                     # step 2 for nullify_noloops: load the unw files
                     for i, ifgd in enumerate(ifgdates):
@@ -735,7 +735,7 @@ def main(argv=None):
             # if still ok, perform the main noloop routine
             #n_para_gap = n_para
             if nullify_noloops:
-                if not nullify_noloops_use_data_before_nullification:
+                if nullify_noloops_use_data_after_nullification:
                     # in such case we will just use the unwpatch
                     unwpatch_ori = unwpatch
                 # step 2 for nullify_noloops: counting the noloops and nullying data from ifgs not forming any loop
