@@ -69,7 +69,7 @@ p12_multi_prime="y"	# y/n. y recommended
 p12_nullify="" # y/n. y recommended
 p12_rm_ifg_list=""	# List file containing ifgs to be manually removed
 p12_skippngs="" # y/n. n by default
-#p13_rmnoloop="" # y/n. n by default # not used anymore, v 1.5.5
+p13_nullify_noloops="y" # y/n. n by default, but 'y' is recommended therefore keeping it through batch script as ON by default
 p13_singular="" # y/n. n by default
 p13_skippngs="" # y/n. n by default
 p15_coh_thre=""	# default: 0.05
@@ -352,7 +352,7 @@ if [ $start_step -le 13 -a $end_step -ge 13 ];then
   if [ ! -z $p13_n_para ];then p13_op="$p13_op --n_para $p13_n_para"; fi
   if [ ! -z $p13_n_unw_r_thre ];then p13_op="$p13_op --n_unw_r_thre $p13_n_unw_r_thre"; fi
   if [ $p13_keep_incfile == "y" ];then p13_op="$p13_op --keep_incfile"; fi
-  #if [ $p13_rmnoloop == "y" ]; then p13_op="$p13_op --rm_noloop"; fi
+  if [ $p13_nullify_noloops == "y" ]; then p13_op="$p13_op --nullify_noloops"; fi
   if [ $p13_singular == "y" ]; then p13_op="$p13_op --singular"; fi
   if [ $p13_skippngs == "y" ]; then p13_op="$p13_op --nopngs"; fi
   if [ $gpu == "y" ];then p13_op="$p13_op --gpu"; fi
