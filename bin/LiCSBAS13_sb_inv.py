@@ -190,10 +190,10 @@ def main(argv=None):
     nopngs = False
     #noloop = False  # setting this later
     input_units = 'rad'
-    nullify_noloops = True #False
-    print('NOTE, keeping nullify_noloops ON by default, for testing..')
+    nullify_noloops = False
+    #print('NOTE, keeping nullify_noloops ON by default, for testing..')
     nullify_noloops_use_data_after_nullification = False
-    print('NOTE, variable nullify_noloops_use_data_after_nullification set to False - testing')
+    #print('NOTE, variable nullify_noloops_use_data_after_nullification set to False - testing')
 
     try:
         n_para = len(os.sched_getaffinity(0))
