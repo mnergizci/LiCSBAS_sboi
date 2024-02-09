@@ -281,7 +281,7 @@ def main(argv=None):
             raise Usage("Wrong units of the input data - available options are: rad, mm, m.")
         if inv_alg not in ['LS', 'WLS']:
             raise Usage("Wrong inversion algorithm - only LS or WLS are the options here")
-        if (inv_alg != 'WLS') and (singular == True):
+        if (inv_alg == 'WLS') and (singular == True):
             raise Usage('Sorry, --singular works only with LS but you requested WLS as inversion algorithm.')
 
     except Usage as err:
