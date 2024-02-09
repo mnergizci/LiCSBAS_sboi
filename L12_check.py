@@ -124,7 +124,7 @@ import LiCSBAS_tools_lib as tools_lib
 import LiCSBAS_inv_lib as inv_lib
 import LiCSBAS_plot_lib as plot_lib
 import xarray as xr
-import SCM
+
 
 class Usage(Exception):
     """Usage context manager"""
@@ -1268,34 +1268,25 @@ def loop_closure_4th(args, da):
 def nullify_unw(ifgd, mask):
     unwfile = os.path.join(ifgdir, ifgd, ifgd + '.unw')
     unwfile_ori = os.path.join(ifgdir, ifgd, ifgd + '.unw.ori')
-    unwinfile = unwfile
     if os.path.exists(unwfile_ori):
-        unwinfile = unwfile_ori # this one is to be read for nullification
+        unwfile = unwfile_ori # this one is to be read for nullification
     elif save_ori_unw:
         # copy to ori for backup
         shutil.copy(unwfile, unwfile_ori)
         if os.path.exists(unwfile+'.png'):
             shutil.move(unwfile+'.png', unwfile_ori+'.png')
-<<<<<<< HEAD
         if os.path.exists(unwfile+'.ras'):
             shutil.move(unwfile+'.ras', unwfile_ori+'.ras')
     if os.path.exists(unwfile):
         unw = io_lib.read_img(unwfile, length, width)
-=======
-    if os.path.exists(unwinfile):
-        unw = io_lib.read_img(unwinfile, length, width)
->>>>>>> 2b94118c2a5b4bb8ccf67b7b619734d1a6f52bae
         # unw[mask==False]=0  # should be ok but it appears as 0 in preview...
         unw[mask == False] = np.nan
-        unw.tofile(unwfile)
+        unw.tofile(os.path.join(ifgdir, ifgd, ifgd + '.unw'))
         # here we nullified based on the mask, now let's generate preview as well
-        unwpngfile = unwfile + '.png'
-        if not os.path.exists(unwpngfile):
-            # use LiCSBAS preview generator
-            cmap_wrap = SCM.romaO
-            cycle = 3
-            plot_lib.make_im_png(np.angle(np.exp(1j * unw / cycle) * cycle), unwpngfile, cmap_wrap,
-                                 unwfile, vmin=-np.pi, vmax=np.pi, cbar=False)
+        #unwpngfile = unwfile + '.png'
+        # but we would need to also have cmap_wrap, so... maybe later
+        #plot_lib.make_im_png(np.angle(np.exp(1j * unw / cycle) * cycle), unwpngfile, cmap_wrap, unwfile,
+        #                     vmin=-np.pi, vmax=np.pi, cbar=False)
 
 # %% main
 if __name__ == "__main__":
