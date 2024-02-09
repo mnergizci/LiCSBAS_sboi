@@ -1276,15 +1276,10 @@ def nullify_unw(ifgd, mask):
         shutil.copy(unwfile, unwfile_ori)
         if os.path.exists(unwfile+'.png'):
             shutil.move(unwfile+'.png', unwfile_ori+'.png')
-<<<<<<< HEAD
         if os.path.exists(unwfile+'.ras'):
             shutil.move(unwfile+'.ras', unwfile_ori+'.ras')
-    if os.path.exists(unwfile):
-        unw = io_lib.read_img(unwfile, length, width)
-=======
     if os.path.exists(unwinfile):
         unw = io_lib.read_img(unwinfile, length, width)
->>>>>>> 2b94118c2a5b4bb8ccf67b7b619734d1a6f52bae
         # unw[mask==False]=0  # should be ok but it appears as 0 in preview...
         unw[mask == False] = np.nan
         unw.tofile(unwfile)
