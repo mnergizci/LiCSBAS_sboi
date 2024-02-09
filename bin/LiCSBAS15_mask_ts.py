@@ -11,7 +11,8 @@ Input & output files
 ===============
 Inputs in TS_GEOCml*/ :
  - results/[vel, coh_avg, n_unw, vstd, maxTlen, n_gap, stc,
-            n_ifg_noloop, n_loop_err, resid_rms]
+            n_ifg_noloop, n_loop_err, resid_rms, n_nullify
+            coh_avg_XX, n_loop_err_rat]
  - info/13parameters.txt
  
 Outputs in TS_GEOCml*/
@@ -27,7 +28,7 @@ Usage
 LiCSBAS15_mask_ts.py -t tsadir [-c coh_thre] [-u n_unw_r_thre] [-v vstd_thre]
   [-T maxTlen_thre] [-g n_gap_thre] [-s stc_thre] [-i n_ifg_noloop_thre]
   [-l n_loop_err_thre] [-r resid_rms_thre] [--vmin float] [--vmax float]
-  [--keep_isolated] [--noautoadjust]
+  [--keep_isolated] [--noautoadjust] [--use_coh_freq]
 
  -t  Path to the TS_GEOCml* dir.
  -c  Threshold of coh_avg (average coherence)
@@ -38,14 +39,17 @@ LiCSBAS15_mask_ts.py -t tsadir [-c coh_thre] [-u n_unw_r_thre] [-v vstd_thre]
  -g  Threshold of n_gap (number of gaps in network)
  -s  Threshold of stc (spatio-temporal consistency (mm))
  -i  Threshold of n_ifg_noloop (number of ifgs with no loop)
- -l  Threshold of n_loop_err (number of loop_err)
+ -l  Threshold of n_loop_err (number of loop_err) - in case of nullification in step 12, this will apply the threshold on n_nullify
+ NOTE: we now test and will update the -l parameter to be a ratio (<=1 where 1 means all bad). Future: default: 0.7
+ -L temporary solution before we switch -l to the ratio
  -r  Threshold of resid_rms (RMS of residuals in inversion (mm))
  --v[min|max]  Min|Max value for output figure of velocity (Default: auto)
  --keep_isolated  Keep (not mask) isolated pixels
                   (Default: they are masked by stc)
  --noautoadjust  Do not auto adjust threshold when all pixels are masked
                  (Default: do auto adjust)
- 
+ --use_coh_freq   Use the most frequent coherence Btemp for masking on the -c threshold (instead of the coh_avg)
+
  Default thresholds for L-band:
    C-band : -c 0.05 -u 1.5 -v 100 -T 1 -g 10 -s 5  -i 50 -l 5 -r 2
    L-band : -c 0.01 -u 1   -v 200 -T 1 -g 1  -s 10 -i 50 -l 1 -r 10
@@ -53,6 +57,8 @@ LiCSBAS15_mask_ts.py -t tsadir [-c coh_thre] [-u n_unw_r_thre] [-v vstd_thre]
 """
 #%% Change log
 '''
+20231121 ML, UoL
+ - use of n_nullify (with -l) and ratios of both loop_err and n_nullify with -L (should be better, will move to this, but now TO_CHECK status
 v1.8.2 20211129 Milan Lazecky, Uni of Leeds
  - Change default -i as global number of no_loop_ifgs + 1
 v1.8.1 20200911 Yu Morishita, GSI
@@ -81,7 +87,7 @@ v1.0 20190724 Yu Morishita, Uni of Leeds and GSI
 #%% Import
 from LiCSBAS_meta import *
 import getopt
-import os
+import os, glob
 os.environ['QT_QPA_PLATFORM']='offscreen'
 import sys
 import time
@@ -131,6 +137,7 @@ def main(argv=None):
     thre_dict = {}
     vmin = []
     vmax = []
+    use_coh_freq = False
     keep_isolated = False
     auto_adjust = True
     
@@ -141,7 +148,7 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "ht:c:u:v:g:i:l:r:T:s:", ["version", "help", "vmin=", "vmax=", "keep_isolated", "noautoadjust"])
+            opts, args = getopt.getopt(argv[1:], "ht:c:u:v:g:i:l:L:r:T:s:", ["version", "help", "vmin=", "vmax=", "use_coh_freq", "keep_isolated", "noautoadjust"])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -165,13 +172,18 @@ def main(argv=None):
             elif o == '-i':
                 thre_dict['n_ifg_noloop'] = int(a)
             elif o == '-l':
-                thre_dict['n_loop_err'] = int(a)
+                thre_dict['n_loop_err'] = int(a)   # TODO: after checking use of the ratio, remove this param and use the ratio only (below)
+            elif o == '-L':
+                thre_dict['n_loop_err_rat'] = float(a)
+                #thre_dict['n_nullify_rat'] = float(a)  # 2024/01: n_loop_err_Rat is now before nullification
             elif o == '-r':
                 thre_dict['resid_rms'] = float(a)
             elif o == '--vmin':
                 vmin = float(a)
             elif o == '--vmax':
                 vmax = float(a)
+            elif o == '--use_coh_freq':
+                use_coh_freq = True
             elif o == '--keep_isolated':
                 keep_isolated = True
             elif o == '--noautoadjust':
@@ -202,13 +214,51 @@ def main(argv=None):
     maskts_png = os.path.join(tsadir,'mask_ts.png')
     maskts2_png = os.path.join(tsadir,'mask_ts_masked.png')
 
-    names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err', 'resid_rms'] ## noise indices
-    gt_lt = ['lt', 'lt', 'gt', 'lt', 'gt', 'gt', 'gt', 'gt', 'gt'] ## > or <
-    ## gt: greater values than thre are masked 
+    #if os.path.exists(os.path.join(resultsdir, 'n_nullify')):
+    #    names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_nullify', 'resid_rms']  ## noise indices
+    #else:
+    #    names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err', 'resid_rms'] ## noise indices
+    #    # TODO: coh_mindays/lt (instead of vstd as: ['n_unw', 'coh_avg', 'coh_mindays', ...])
+    '''
+    if os.path.exists(os.path.join(resultsdir, 'n_nullify_rat')):
+        # debug here
+        cohfreqfile = glob.glob(resultsdir + '/coh_avg_*.png')
+        if len(cohfreqfile)>0:
+            cohfreqfile = cohfreqfile[0]
+            cohfreq = cohfreqfile.split('_')[-1].split('.')[0] #str
+            names = [ 'n_unw', 'coh_avg', 'coh_avg_'+cohfreq, 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_nullify_rat',
+                     'resid_rms']  ## noise indices
+            gt_lt = ['lt', 'lt', 'lt', 'lt', 'gt', 'gt', 'gt', 'gt', 'gt']  ## > or <
+            units = ['', '', '', 'yr', '', 'mm', '', '', 'mm']
+            if use_coh_freq:
+                thre_dict['coh_avg_' + cohfreq] = thre_dict['coh_avg']
+                thre_dict['coh_avg'] = 0
+            else:
+                thre_dict['coh_avg_' + cohfreq] = 0.05
+        else:
+            if use_coh_freq:
+                print('Warning, you request use of most frequent coherence for masking but this is not generated (rerun step 12). Using coh_avg only.')
+            names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_nullify_rat',
+                     'resid_rms']  ## noise indices
+            gt_lt = ['lt', 'lt', 'gt', 'lt', 'gt', 'gt', 'gt', 'gt', 'gt']  ## > or <
+            units = ['', '', 'mm/yr', 'yr', '', 'mm', '', '', 'mm']
+    elif os.path.exists(os.path.join(resultsdir, 'n_nullify')):
+        # temporary for the 'version inbetween'
+        names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_nullify',
+                 'resid_rms']  ## noise indices
+        gt_lt = ['lt', 'lt', 'gt', 'lt', 'gt', 'gt', 'gt', 'gt', 'gt']  ## > or <
+        units = ['', '', 'mm/yr', 'yr', '', 'mm', '', '', 'mm']
+    else:
+        # orig figure
+        #names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err_rat', 'resid_rms'] # TODO: set n_loop_err_rat instead for masking!
+    '''
+    print('WARNING, 2024/01 change in DEV branch - n_loop_err_ratio is used (before nullification if done)')
+    #names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err', 'resid_rms']
+    names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err_rat', 'resid_rms']
+    gt_lt = ['lt', 'lt', 'gt', 'lt', 'gt', 'gt', 'gt', 'gt', 'gt']  ## > or <
+    ## gt: greater values than thre are masked
     ## lt: more little values than thre are masked (coh_avg, n_unw, maxTlen)
-
     units = ['', '', 'mm/yr', 'yr', '', 'mm', '', '', 'mm']
-
 
     ### Get size and ref
     width = int(io_lib.get_param_par(inparmfile, 'range_samples'))
@@ -220,11 +270,28 @@ def main(argv=None):
     
     #%% Determine default thresholds depending on frequency band
     if not 'maxTlen' in thre_dict: thre_dict['maxTlen'] = 1
+    '''
+    # 20231122 update:
+    if (not 'n_nullify_rat' in thre_dict) and ('n_nullify_rat' in names):
+        thre_dict['n_nullify_rat'] = 0.9
+    if (not 'n_nullify' in thre_dict) and ('n_nullify' in names):
+        if 'n_loop_err' in thre_dict:
+            # if we used -l, we can use the same number for the n_nullify
+            thre_dict['n_nullify'] = thre_dict['n_loop_err']
+        else:
+            try:
+                with open(os.path.join(tsadir, '12loop', 'loop_info.txt'), 'r') as fp:
+                    thre_dict['n_nullify'] = int((len(fp.readlines()) - 4)/3)   # set threshold as 'bad in all loops'
+            except:
+                thre_dict['n_nullify'] = 1000
+    '''
+    if (not 'n_loop_err_rat' in thre_dict) and ('n_loop_err_rat' in names):
+        thre_dict['n_loop_err_rat'] = 0.7
     if not 'n_ifg_noloop' in thre_dict:
         try:
             thre_dict['n_ifg_noloop'] = len(os.listdir(os.path.join(tsadir, '12no_loop_ifg_ras')))+1
         except:
-            thre_dict['n_ifg_noloop'] = 50
+            thre_dict['n_ifg_noloop'] = 500
 
     if wavelength > 0.2: ## L-band
         if not 'coh_avg' in thre_dict: thre_dict['coh_avg'] = 0.01
@@ -239,9 +306,9 @@ def main(argv=None):
         if not 'n_unw_r' in thre_dict: thre_dict['n_unw_r'] = 1.5
         if not 'vstd' in thre_dict: thre_dict['vstd'] = 100
         if not 'n_gap' in thre_dict: thre_dict['n_gap'] = 10
-        if not 'stc' in thre_dict: thre_dict['stc'] = 5
+        if not 'stc' in thre_dict: thre_dict['stc'] = 10 # tested as more appropriate
         if not 'n_loop_err' in thre_dict: thre_dict['n_loop_err'] = 5
-        if not 'resid_rms' in thre_dict: thre_dict['resid_rms'] = 2
+        if not 'resid_rms' in thre_dict: thre_dict['resid_rms'] = 50 # as the ref point would cause issues
     
     thre_dict['n_unw'] = int(n_im*thre_dict['n_unw_r'])
 

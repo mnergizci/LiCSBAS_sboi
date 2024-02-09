@@ -8,6 +8,8 @@ Python3 library of time series inversion functions for LiCSBAS.
 =========
 Changelog
 =========
+20231101 Yasser Maghsoudi (and ML), Uni Leeds
+ - changed least squares function from np to scipy.sparse for faster NSBAS inversion
 v1.5.2 20211122 Milan Lazecky, Uni Leeds
  - use bit more economic computations (for tutorial purposes)
 v1.5.1 20210309 Yu Morishita, GSI
@@ -37,6 +39,9 @@ import datetime as dt
 import multiprocessing as multi
 from astropy.stats import bootstrap
 from astropy.utils import NumpyRNGContext
+#from scipy.sparse.linalg import lsqr as sparselsq
+from scipy.sparse.linalg import lsmr as sparselsq
+from scipy.sparse import csr_array, csc_array  # csr_matrix, csc_matrix # but maybe coo_matrix would be better for G? to be checked
 import LiCSBAS_tools_lib as tools_lib
 try:
     from sklearn.linear_model import RANSACRegressor
@@ -190,6 +195,7 @@ def invert_nsbas(unw, G, dt_cum, gamma, n_core, gpu, singular=False, only_sb=Fal
             args = [i for i in range(n_pt-n_pt_full)]
             q = multi.get_context('fork')
             p = q.Pool(n_core)
+            A = csc_array(Gall)  # or csr?
             _result = p.map(censored_lstsq_slow_para_wrapper, args) #list[n_pt][length]
             result[:, ~bool_pt_full] = np.array(_result).T
             #
@@ -268,11 +274,13 @@ def singular_nsbas(d,G,m,dt_cum):
 
 def censored_lstsq_slow_para_wrapper(i):
     ### Use global value
+    #A = csc_array(Gall) # or csr?
     if np.mod(i, 100) == 0:
         print('  Running {0:6}/{1:6}th point...'.format(i, unw_tmp.shape[1]), flush=True)
     m = mask[:,i] # drop rows where mask is zero
     try:
-        X = np.linalg.lstsq(Gall[m], unw_tmp[m,i], rcond=None)[0]
+        #X = np.linalg.lstsq(Gall[m], unw_tmp[m,i], rcond=None)[0]
+        X = sparselsq(A[m], unw_tmp[m, i], atol=1e-05, btol=1e-05)[0]
     except:
         X = np.zeros((Gall.shape[1]), dtype=np.float32)*np.nan
     return X
@@ -700,13 +708,18 @@ def censored_lstsq_slow(A, B, M):
     """
 
     X = np.empty((A.shape[1], B.shape[1]))
+    # 20231101 update - not tested
+    #A = csr_matrix(A) # or csc?
+    A = csc_array(A) # or csr?
     for i in range(B.shape[1]):
         if np.mod(i, 100) == 0:
              print('\r  Running {0:6}/{1:6}th point...'.format(i, B.shape[1]), end='', flush=True)
 
         m = M[:,i] # drop rows where mask is zero
         try:
-            X[:,i] = np.linalg.lstsq(A[m], B[m,i], rcond=None)[0]
+            #X[:,i] = np.linalg.lstsq(A[m], B[m,i], rcond=None)[0]
+            # 20231101 update
+            X[:, i] = sparselsq(A[m], B[m, i], atol=1e-05, btol=1e-05)[0]
         except:
             X[:,i] = np.nan
 

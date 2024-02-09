@@ -141,6 +141,8 @@ def main(argv=None):
     ### Read cumfile
     cumh5 = h5.File(cumfile,'r')
     imdates = cumh5['imdates'][()].astype(str).tolist()
+    # cumh5 = xr.open_dataset(cumfile) # future: xr
+    # imdates = list(a.time.dt.strftime('%Y%m%d').values)
     cum = cumh5['cum']
     n_im_all, length, width = cum.shape
 

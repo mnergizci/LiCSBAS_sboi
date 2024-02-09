@@ -23,8 +23,7 @@ dependencies:
   - holoviews
   - netCDF4
   - bottleneck
-  - scikit-learn
   - dask
   - colorcet
   - networkx
-  
+  - scipy

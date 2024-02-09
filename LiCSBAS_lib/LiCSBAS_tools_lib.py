@@ -46,7 +46,10 @@ import warnings
 from matplotlib.colors import LinearSegmentedColormap as LSC
 from matplotlib import pyplot as plt
 import matplotlib.path as path
-import networkx as nx
+try:
+    import networkx as nx
+except:
+    print('networkx is not installed. LiCSBAS Plus functions will not work')
 
 
 #%%

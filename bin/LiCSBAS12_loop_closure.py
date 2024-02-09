@@ -124,7 +124,7 @@ import LiCSBAS_tools_lib as tools_lib
 import LiCSBAS_inv_lib as inv_lib
 import LiCSBAS_plot_lib as plot_lib
 import xarray as xr
-
+import SCM
 
 class Usage(Exception):
     """Usage context manager"""
@@ -146,7 +146,7 @@ def main(argv=None):
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
-    global Aloop, ifgdates, ifgdir, length, width, loop_pngdir, cycle, nullify_threshold, \
+    global Aloop, ifgdates, ifgdir, length, width, loop_pngdir, cycle, nullify_threshold, save_ori_unw, \
         multi_prime, bad_ifg, noref_ifg, bad_ifg_all, refy1, refy2, refx1, refx2  ## for parallel processing
 
     # %% Set default
@@ -324,13 +324,17 @@ def main(argv=None):
 
     # replace .unw with .unw.ori OR REVERSE
     if save_ori_unw:
-        print('Saving original ifg files')
+        print('Saving original ifg files') # this will be done through the nullification function itself
+        '''
         for ifgd in ifgdates:
             unwfile_ori = os.path.join(ifgdir, ifgd, ifgd + '.unw.ori')
             unwfile = os.path.join(ifgdir, ifgd, ifgd + '.unw')
-            unw = io_lib.read_img(unwfile, length, width)
-            unw.tofile(unwfile_ori)
-
+            if not os.path.exists(unwfile_ori):
+                rc = shutil.move(unwfile, unwfile_ori)
+            ### if ori already exists, we should not modify it!
+            #unw = io_lib.read_img(unwfile, length, width)
+            #unw.tofile(unwfile_ori)
+        '''
     ### Parallel processing
     p = q.Pool(_n_para)
     loop_ph_rms_ifg = np.array(p.map(loop_closure_1st_wrapper, range(n_loop)), dtype=np.float32)
@@ -384,6 +388,9 @@ def main(argv=None):
             continue
 
         unwfile = os.path.join(ifgdir, ifgd, ifgd + '.unw')
+        unwfile_ori = os.path.join(ifgdir, ifgd, ifgd + '.unw.ori')
+        if os.path.exists(unwfile_ori):
+            unwfile = unwfile_ori
         unw = io_lib.read_img(unwfile, length, width)
 
         unw[unw == 0] = np.nan  # Fill 0 with nan
@@ -533,6 +540,9 @@ def main(argv=None):
             continue
 
         unwfile = os.path.join(ifgdir, ifgd, ifgd + '.unw')
+        unwfile_ori = os.path.join(ifgdir, ifgd, ifgd + '.unw.ori')
+        if os.path.exists(unwfile_ori):
+            unwfile = unwfile_ori
         unw_ref = io_lib.read_img(unwfile, length, width)[refy1:refy2, refx1:refx2]
 
         unw_ref[unw_ref == 0] = np.nan  # Fill 0 with nan
@@ -629,9 +639,10 @@ def main(argv=None):
     # p.close()
     # dataarray is not updated through parallel processing. avoiding parallelisation now
     ns_loop_err, da = loop_closure_4th([0, len(Aloop)], da)
-    n_nullify = np.zeros((length, width), dtype=np.float32)
+    n_nullify = None
     # ns_loop_err = np.sum(res[:, :, :,], axis=0)
     if nullify:
+        n_nullify = np.zeros((length, width), dtype=np.float32)
         print('nullifying unws with loop errors - not parallel now')
         for ifgd in ifgdates:
             mask = da.loc[:, :, ifgd].values
@@ -640,7 +651,11 @@ def main(argv=None):
                 n_nullify = n_nullify + np.multiply(np.logical_not(np.array(mask)), 1)
                 nullify_unw(ifgd, mask)
         # recalculating ns_loop_err to be after nullification (long but... ok for now)
-        ns_loop_err, da = loop_closure_4th([0, len(Aloop)], da)
+        #print('debug 2024/01: keeping n_loop_err from before nullification')
+        #ns_loop_err, da = loop_closure_4th([0, len(Aloop)], da)
+
+
+
     # generate loop pngs:
     if do_pngs:
         ### Parallel processing
@@ -711,10 +726,18 @@ def main(argv=None):
 
     # %% Saving coh_avg, n_unw, and n_loop_err only for good ifgs
     print('\nSaving coh_avg, n_unw, and n_loop_err...', flush=True)
+
+
     ### Calc coh avg and n_unw
     coh_avg = np.zeros((length, width), dtype=np.float32)
     n_coh = np.zeros((length, width), dtype=np.int16)
     n_unw = np.zeros((length, width), dtype=np.int16)
+
+    btemps = tools_lib.calc_temporal_baseline(ifgdates_good)
+    thisbtemp = max(set(btemps), key=btemps.count)
+    coh_avg_freq = np.zeros((length, width), dtype=np.float32)
+    n_coh_freq = np.zeros((length, width), dtype=np.int16)
+    ii = 0
     for ifgd in ifgdates_good:
         ccfile = os.path.join(ifgdir, ifgd, ifgd + '.cc')
         if os.path.getsize(ccfile) == length * width:
@@ -726,16 +749,27 @@ def main(argv=None):
 
         coh_avg += coh
         n_coh += (coh != 0)
-
-        unwfile = os.path.join(ifgdir, ifgd, ifgd + '.unw')
+        if btemps[ii] == thisbtemp:
+            coh_avg_freq += coh
+            n_coh_freq += (coh != 0)
+        ii = ii + 1
+        unwfile = os.path.join(ifgdir, ifgd, ifgd+'.unw') # after nullification
+        #unwfile_ori = os.path.join(ifgdir, ifgd, ifgd + '.unw.ori')
+        #if os.path.exists(unwfile_ori):
+        #    unwfile = unwfile_ori
         unw = io_lib.read_img(unwfile, length, width)
-
-        unw[unw == 0] = np.nan  # Fill 0 with nan
-        n_unw += ~np.isnan(unw)  # Summing number of unnan unw
+        unw[unw == 0] = np.nan # Fill 0 with nan
+        n_unw += ~np.isnan(unw) # Summing number of unnan unw
 
     coh_avg[n_coh == 0] = np.nan
     n_coh[n_coh == 0] = 1  # to avoid zero division
     coh_avg = coh_avg / n_coh
+    coh_avg[coh_avg == 0] = np.nan
+
+    coh_avg_freq[n_coh_freq == 0] = np.nan
+    n_coh_freq[n_coh_freq == 0] = 1  # to avoid zero division
+    coh_avg_freq = coh_avg_freq / n_coh_freq
+    coh_avg_freq[coh_avg_freq == 0] = np.nan
 
     ### Save files
     n_unwfile = os.path.join(resultsdir, 'n_unw')
@@ -744,25 +778,53 @@ def main(argv=None):
     coh_avgfile = os.path.join(resultsdir, 'coh_avg')
     coh_avg.tofile(coh_avgfile)
 
+    coh_avgFfile = os.path.join(resultsdir, 'coh_avg_'+str(thisbtemp))
+    coh_avg_freq.tofile(coh_avgFfile)
+
     n_loop_errfile = os.path.join(resultsdir, 'n_loop_err')
     np.float32(ns_loop_err).tofile(n_loop_errfile)
 
-    # if save_ori_unw:   #ML: saving always
-    n_nullify_file = os.path.join(resultsdir, 'n_nullify')
-    np.float32(n_nullify).tofile(n_nullify_file)
+    # ML: store ratio, use instead of looperr?
+    ns_loop_err_rat = ns_loop_err / n_loop
+    n_loop_err_rat_file = os.path.join(resultsdir, 'n_loop_err_rat')
+    np.float32(ns_loop_err_rat).tofile(n_loop_err_rat_file)
+
+    if n_nullify is not None:
+        # if save_ori_unw:   #ML: saving always
+        n_nullify_file = os.path.join(resultsdir, 'n_nullify')
+        np.float32(n_nullify).tofile(n_nullify_file)
+        #
+        # ML: store ratio (is similar to ns_loop_err_rat?)
+        n_nullify_rat = n_nullify/(n_unw - len(no_loop_ifg))
+        n_nullify_rat_file = os.path.join(resultsdir, 'n_nullify_rat')
+        np.float32(n_nullify_rat).tofile(n_nullify_rat_file)
 
     ### Save png
     title = 'Average coherence'
     plot_lib.make_im_png(coh_avg, coh_avgfile + '.png', cmap_noise, title)
+
+    title = 'Average {} days coherence'.format(str(thisbtemp))
+    plot_lib.make_im_png(coh_avg_freq, coh_avgFfile + '.png', cmap_noise, title)
+
     title = 'Number of used unw data'
     plot_lib.make_im_png(n_unw, n_unwfile + '.png', cmap_noise, title, n_im)
 
-    title = 'Number of unclosed loops'
+    if nullify:
+        strnul = ' (before nullification)'
+    else:
+        strnul = ''
+    title = 'Number of unclosed loops'+strnul
     plot_lib.make_im_png(ns_loop_err, n_loop_errfile + '.png', cmap_noise_r, title)
 
-    # if save_ori_unw:
-    title = 'Number of nullified ifgs'
-    plot_lib.make_im_png(n_nullify, n_nullify_file + '.png', cmap_noise_r, title)
+    title = 'Ratio of unclosed loops vs all triplets'+strnul
+    plot_lib.make_im_png(ns_loop_err_rat, n_loop_err_rat_file + '.png', cmap_noise_r, title)
+
+    if n_nullify is not None:
+        title = 'Number of nullified ifgs'
+        plot_lib.make_im_png(n_nullify, n_nullify_file + '.png', cmap_noise_r, title)
+        #
+        title = 'Ratio of nullified pixels in unw data with loops'
+        plot_lib.make_im_png(n_nullify_rat, n_nullify_rat_file + '.png', cmap_noise_r, title)
 
     # %% Link ras
     ### First, identify suffix of raster image (ras, bmp, or png?)
@@ -773,22 +835,25 @@ def main(argv=None):
         suffix = '.bmp'
     elif os.path.exists(unwfile + '.png'):
         suffix = '.png'
-
-    for ifgd in ifgdates:
-        rasname = ifgd + '.unw' + suffix
-        rasorg = os.path.join(ifgdir, ifgd, rasname)
-        ### Bad ifgs
-        if ifgd in bad_ifg_all:
-            os.symlink(os.path.relpath(rasorg, bad_ifgrasdir), os.path.join(bad_ifgrasdir, rasname))
-        ### Remaining bad ifg candidates
-        elif ifgd in bad_ifg_cand_res:
-            os.symlink(os.path.relpath(rasorg, bad_ifg_candrasdir), os.path.join(bad_ifg_candrasdir, rasname))
-        ### Good ifgs
-        else:
-            os.symlink(os.path.relpath(rasorg, ifg_rasdir), os.path.join(ifg_rasdir, rasname))
-
-        if ifgd in no_loop_ifg:
-            os.symlink(os.path.relpath(rasorg, no_loop_ifgrasdir), os.path.join(no_loop_ifgrasdir, rasname))
+    elif os.path.exists(unwfile + '.jpg'):
+        suffix = '.jpg'
+    else:
+        suffix = ''
+    if suffix:
+        for ifgd in ifgdates:
+            rasname = ifgd + '.unw' + suffix
+            rasorg = os.path.join(ifgdir, ifgd, rasname)
+            ### Bad ifgs
+            if ifgd in bad_ifg_all:
+                os.symlink(os.path.relpath(rasorg, bad_ifgrasdir), os.path.join(bad_ifgrasdir, rasname))
+            ### Remaining bad ifg candidates
+            elif ifgd in bad_ifg_cand_res:
+                os.symlink(os.path.relpath(rasorg, bad_ifg_candrasdir), os.path.join(bad_ifg_candrasdir, rasname))
+            ### Good ifgs
+            else:
+                os.symlink(os.path.relpath(rasorg, ifg_rasdir), os.path.join(ifg_rasdir, rasname))
+            if ifgd in no_loop_ifg:
+                os.symlink(os.path.relpath(rasorg, no_loop_ifgrasdir), os.path.join(no_loop_ifgrasdir, rasname))
 
     # %% Plot network
     ## Read bperp data or dummy
@@ -1201,12 +1266,28 @@ def loop_closure_4th(args, da):
 
 def nullify_unw(ifgd, mask):
     unwfile = os.path.join(ifgdir, ifgd, ifgd + '.unw')
-    if os.path.exists(unwfile):
-        unw = io_lib.read_img(unwfile, length, width)
+    unwfile_ori = os.path.join(ifgdir, ifgd, ifgd + '.unw.ori')
+    unwinfile = unwfile
+    if os.path.exists(unwfile_ori):
+        unwinfile = unwfile_ori # this one is to be read for nullification
+    elif save_ori_unw:
+        # copy to ori for backup
+        shutil.copy(unwfile, unwfile_ori)
+        if os.path.exists(unwfile+'.png'):
+            shutil.move(unwfile+'.png', unwfile_ori+'.png')
+    if os.path.exists(unwinfile):
+        unw = io_lib.read_img(unwinfile, length, width)
         # unw[mask==False]=0  # should be ok but it appears as 0 in preview...
         unw[mask == False] = np.nan
         unw.tofile(unwfile)
-
+        # here we nullified based on the mask, now let's generate preview as well
+        unwpngfile = unwfile + '.png'
+        if not os.path.exists(unwpngfile):
+            # use LiCSBAS preview generator
+            cmap_wrap = SCM.romaO
+            cycle = 3
+            plot_lib.make_im_png(np.angle(np.exp(1j * unw / cycle) * cycle), unwpngfile, cmap_wrap,
+                                 unwfile, vmin=-np.pi, vmax=np.pi, cbar=False)
 
 # %% main
 if __name__ == "__main__":

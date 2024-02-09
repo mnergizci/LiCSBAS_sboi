@@ -19,7 +19,7 @@
 start_step="01"	# 01-05, 11-16
 end_step="16"	# 01-05, 11-16
 
-cometdev='0' # shortcut to use COMET's experimental/dev functions. Now rather obsolete. Recommended: 0
+cometdev='0' # shortcut to use COMET's experimental/dev functions. At this moment, '1' will turn on the nullification. Recommended: 0
 nlook="1"	# multilook factor, used in step02
 GEOCmldir="GEOCml${nlook}"	# If start from 11 or later after doing 03-05, use e.g., GEOCml${nlook}GACOSmaskclip
 n_para="" # Number of parallel processing in step 02-05,12,13,16. default: number of usable CPU
@@ -50,6 +50,7 @@ p02to05_freq=$freq # default: 5.405e9 Hz
 p02to05_gacos="" # y/n. default: 'y'. Use gacos data if available (for majority of epochs, data without GACOS corr would be dropped)
 p02to05_hgtcorr="" # y/n. default: 'n'. Recommended for regions with high and varying topography
 p02to05_cascade="" # y/n. default: 'n'. Cascade from higher multilook factor would propagate to higher resolution (lower ML factor) data. Useful but not universal
+p02to05_filter="" # gold, gauss or adf. Default: 'gold'
 p02to05_thres="" # default: 0.35. Spatial consistence of the interferogram. Recommended to keep this value. If too much is masked, may try getting close to 0 (although, this would introduce some unw errors)
 p02to05_cliparea_geo=$p05_clip_range_geo # setting the clip range, e.g. 130.11/131.12/34.34/34.6 (in deg)
 p02to05_n_para=$n_para
@@ -68,7 +69,7 @@ p12_multi_prime="y"	# y/n. y recommended
 p12_nullify="" # y/n. y recommended
 p12_rm_ifg_list=""	# List file containing ifgs to be manually removed
 p12_skippngs="" # y/n. n by default
-#p13_rmnoloop="" # y/n. n by default # not used anymore, v 1.5.5
+p13_nullify_noloops="y" # y/n. n by LiCSBAS default, but 'y' is recommended therefore keeping it through batch script as ON by default
 p13_singular="" # y/n. n by default
 p13_skippngs="" # y/n. n by default
 p15_coh_thre=""	# default: 0.05
@@ -76,10 +77,11 @@ p15_n_unw_r_thre=""	# default: 1.5
 p15_vstd_thre=""	# default: 100 mm/yr
 p15_maxTlen_thre=""	# default: 1 yr
 p15_n_gap_thre=""	# default: 10
-p15_stc_thre=""	# default: 5 mm
-p15_n_ifg_noloop_thre=""	# default: 50
+p15_stc_thre=""	# default: 10 mm
+p15_n_ifg_noloop_thre=""	# default: 500 - setting this much higher than orig since we nullify them (p13_nullify_noloops)
 p15_n_loop_err_thre=""	# default: 5
-p15_resid_rms_thre=""	# default: 2 mm
+p15_n_loop_err_ratio_thre=""	# default: 0.7 - in future we will switch to this ratio term, instead of n_loop_err
+p15_resid_rms_thre=""	# default: 50 mm, but setting much higher than orig since it depends on (automatic) ref point, must be optimised
 p16_filtwidth_km=""	# default: 2 km
 p16_filtwidth_yr=""	# default: avg_interval*3 yr
 p16_deg_deramp=""	# 1, bl, or 2. default: no deramp
@@ -120,7 +122,7 @@ p13_inv_alg=""	# LS (default) or WLS
 p13_mem_size=""	# default: 8000 (MB)
 p13_gamma=""	# default: 0.0001
 p13_n_para=$n_para	# default: # of usable CPU
-p13_n_unw_r_thre=""	# defualt: 1
+p13_n_unw_r_thre=""	# default: 1 for shorter-than-L-band-wavelength (if cometdev, will set to 0.1)
 p13_keep_incfile="n"	# y/n. default: n
 p14_TSdir=""    # default: TS_$GEOCmldir
 p14_mem_size="" # default: 4000 (MB)
@@ -180,6 +182,7 @@ if [ $skipstep02 -eq 1 ]; then
   if [ ! -z $p02to05_freq ];then p02to05_op="$p02to05_op --freq $p02to05_freq"; fi
   if [ ! -z $p02to05_n_para ];then p02to05_op="$p02to05_op --n_para $p02to05_n_para"; fi
   if [ ! -z $p02to05_thres ];then p02to05_op="$p02to05_op --thres $p02to05_thres"; fi
+  if [ ! -z $p02to05_filter ];then p02to05_op="$p02to05_op --filter $p02to05_filter"; fi
   if [ ! -z $p02to05_cliparea_geo ];then p02to05_op="$p02to05_op -g $p02to05_cliparea_geo"; fi
   if [ $p02to05_cascade == "y" ];then p02to05_op="$p02to05_op --cascade"; fi
   if [ $p02to05_hgtcorr == "y" ];then p02to05_op="$p02to05_op --hgtcorr"; fi
@@ -350,7 +353,7 @@ if [ $start_step -le 13 -a $end_step -ge 13 ];then
   if [ ! -z $p13_n_para ];then p13_op="$p13_op --n_para $p13_n_para"; fi
   if [ ! -z $p13_n_unw_r_thre ];then p13_op="$p13_op --n_unw_r_thre $p13_n_unw_r_thre"; fi
   if [ $p13_keep_incfile == "y" ];then p13_op="$p13_op --keep_incfile"; fi
-  #if [ $p13_rmnoloop == "y" ]; then p13_op="$p13_op --rm_noloop"; fi
+  if [ $p13_nullify_noloops == "y" ]; then p13_op="$p13_op --nullify_noloops"; fi
   if [ $p13_singular == "y" ]; then p13_op="$p13_op --singular"; fi
   if [ $p13_skippngs == "y" ]; then p13_op="$p13_op --nopngs"; fi
   if [ $gpu == "y" ];then p13_op="$p13_op --gpu"; fi
@@ -360,6 +363,9 @@ if [ $start_step -le 13 -a $end_step -ge 13 ];then
   else
     if [ $cometdev -eq 1 ]; then
      extra='--nopngs'
+     if [ -z $p13_n_unw_r_thre ];then
+       extra=$extra' --n_unw_r_thre 0.4'
+     fi
      #extra='--singular --nopngs'
     else
      extra=''
@@ -396,6 +402,7 @@ if [ $start_step -le 15 -a $end_step -ge 15 ];then
   if [ ! -z $p15_stc_thre ];then p15_op="$p15_op -s $p15_stc_thre"; fi
   if [ ! -z $p15_n_ifg_noloop_thre ];then p15_op="$p15_op -i $p15_n_ifg_noloop_thre"; fi
   if [ ! -z $p15_n_loop_err_thre ];then p15_op="$p15_op -l $p15_n_loop_err_thre"; fi
+  if [ ! -z $p15_n_loop_err_ratio_thre ];then p15_op="$p15_op -L $p15_n_loop_err_ratio_thre"; fi
   if [ ! -z $p15_resid_rms_thre ];then p15_op="$p15_op -r $p15_resid_rms_thre"; fi
   if [ ! -z $p15_vmin ];then p15_op="$p15_op --vmin $p15_vmin"; fi
   if [ ! -z $p15_vmax ];then p15_op="$p15_op --vmax $p15_vmax"; fi

@@ -33,17 +33,20 @@ Inputs in GEOCml*/ :
 =====
 Usage
 =====
-LiCSBAS11_check_unw.py -d ifgdir [-t tsadir] [-c coh_thre] [-u unw_thre] [-s]
+LiCSBAS11_check_unw.py -d ifgdir [-t tsadir] [-c coh_thre] [-u unw_thre] [-m minbtemp] [-s]
 
  -d  Path to the GEOCml* dir containing stack of unw data.
  -t  Path to the output TS_GEOCml* dir. (Default: TS_GEOCml*)
  -c  Threshold of average coherence (Default: 0.05)
  -u  Threshold of coverage of unw data (Default: 0.3)
+ -m  Minimal Btemp in days (Default: 0)
  -s  Check for coregistration error in the form of a significant azimuthal ramp
 
 """
 #%% Change log
 '''
+20240115 ML
+ - add min btemp parameter (to avoid fading bias in agri areas, we recommend setting minbtemp=12 for S1. Or nullify with smaller threshold in step 1-2)
 v1.4 20221011 Qi Ou, Uni of Leeds
  - Detect coregistration error as big azimuthal ramp in the middle (arbitrary) column
  - Shortlist by slope > 30, R2 > 0.95, then expand based on repeated epochs in the shortlist, threshold with slopd > 20
@@ -105,11 +108,12 @@ def main(argv=None):
     coh_thre = 0.05
     unw_cov_thre = 0.3
     check_coreg_slope = False
+    minbtemp = 0
 
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hd:t:c:u:s", ["help"])
+            opts, args = getopt.getopt(argv[1:], "hd:t:c:u:m:s", ["help"])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -124,6 +128,8 @@ def main(argv=None):
                 coh_thre = float(a)
             elif o == '-u':
                 unw_cov_thre = float(a)
+            elif o == '-m':
+                minbtemp = float(a)
             elif o == '-s':
                 check_coreg_slope = True
 
@@ -343,18 +349,20 @@ def main(argv=None):
     elif os.path.exists(unwfile+'.png'):
         suffix = '.png'
     else:
-        print('\nERROR: No browse image available for {}!\n'
+        suffix = ''
+        print('\nWARNING: No browse image available for {}\n'
               .format(unwfile), file=sys.stderr)
-        return 2
+        #return 2
 
     for i, ifgd in enumerate(ifgdates):
-        rasname = ifgdates[i]+'.unw'+suffix
-        rasorg = os.path.join(ifgdir, ifgdates[i], rasname)
+        if suffix:
+            rasname = ifgdates[i]+'.unw'+suffix
+            rasorg = os.path.join(ifgdir, ifgdates[i], rasname)
 
-        if not os.path.exists(rasorg):
-            print('\nERROR: No browse image {} available!\n'
-                  .format(rasorg), file=sys.stderr)
-            return 2
+            if not os.path.exists(rasorg):
+                print('\nERROR: No browse image {} available!\n'
+                      .format(rasorg), file=sys.stderr)
+                return 2
 
         ### Identify bad ifgs and link ras
         if rate_cov[i] < unw_cov_thre or coh_avg_ifg[i] < coh_thre or \
@@ -362,9 +370,11 @@ def main(argv=None):
             bad_ifgdates.append(ifgdates[i])
             ixs_bad_ifgdates.append(i)
             rm_flag = '*'
-            os.symlink(os.path.relpath(rasorg, bad_ifg_rasdir), os.path.join(bad_ifg_rasdir, rasname))
+            if suffix:
+                os.symlink(os.path.relpath(rasorg, bad_ifg_rasdir), os.path.join(bad_ifg_rasdir, rasname))
         else:
-            os.symlink(os.path.relpath(rasorg, ifg_rasdir), os.path.join(ifg_rasdir, rasname))
+            if suffix:
+                os.symlink(os.path.relpath(rasorg, ifg_rasdir), os.path.join(ifg_rasdir, rasname))
             rm_flag = ''
 
         ### For stats file
@@ -400,6 +410,12 @@ def main(argv=None):
     if len(bad_ifgdates) == n_ifg:
         raise ValueError('All ifgs are regarded as bad!\nChange the parameters or check the input ifgs.\n')
 
+    # Not use ifgs above given btemp
+    if minbtemp>0:
+        btemps = tools_lib.calc_temporal_baseline(ifgdates)
+        bad_ifgdates += ifgdates[btemps < minbtemp]
+        bad_ifgdates += list(np.array(ifgdates)[np.array(btemps) < minbtemp])
+        bad_ifgdates = list(set(bad_ifgdates))
 
     #%% Identify removed image and output file
     good_ifgdates = list(set(ifgdates)-set(bad_ifgdates))

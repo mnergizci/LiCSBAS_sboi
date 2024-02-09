@@ -36,7 +36,7 @@ LiCSBAS02_ml_prep.py -i GEOCdir [-o GEOCmldir] [-n nlook] [--freq float] [--n_pa
 
  -i  Path to the input GEOC dir containing stack of geotiff data
  -o  Path to the output GEOCml dir (Default: GEOCml[nlook])
- -n  Number of donwsampling factor (Default: 1, no donwsampling)
+ -n  Number of donwsampling factor (Default: 1, no downsampling)
  --freq    Radar frequency in Hz (Default: 5.405e9 for Sentinel-1)
            (e.g., 1.27e9 for ALOS, 1.2575e9 for ALOS-2/U, 1.2365e9 for ALOS-2/{F,W})
  --n_para  Number of parallel processing (Default: # of usable CPU)
