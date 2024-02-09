@@ -4,6 +4,8 @@
 This script unwraps GeoTIFF files of wrapped interferograms, for further time series analysis.
 It replaces the original LiCSBAS steps 02-05 (except for 04), as these are done in one go.
 
+NOTE: If your input data are coming from the LiCSAR system, please make sure you did run LiCSBAS01 with parameter --get_pha
+
 ====================
 Input & output files
 ====================
