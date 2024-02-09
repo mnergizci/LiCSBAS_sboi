@@ -291,7 +291,7 @@ def main(argv=None):
         try:
             thre_dict['n_ifg_noloop'] = len(os.listdir(os.path.join(tsadir, '12no_loop_ifg_ras')))+1
         except:
-            thre_dict['n_ifg_noloop'] = 50
+            thre_dict['n_ifg_noloop'] = 500
 
     if wavelength > 0.2: ## L-band
         if not 'coh_avg' in thre_dict: thre_dict['coh_avg'] = 0.01
@@ -306,9 +306,9 @@ def main(argv=None):
         if not 'n_unw_r' in thre_dict: thre_dict['n_unw_r'] = 1.5
         if not 'vstd' in thre_dict: thre_dict['vstd'] = 100
         if not 'n_gap' in thre_dict: thre_dict['n_gap'] = 10
-        if not 'stc' in thre_dict: thre_dict['stc'] = 5
+        if not 'stc' in thre_dict: thre_dict['stc'] = 10 # tested as more appropriate
         if not 'n_loop_err' in thre_dict: thre_dict['n_loop_err'] = 5
-        if not 'resid_rms' in thre_dict: thre_dict['resid_rms'] = 2
+        if not 'resid_rms' in thre_dict: thre_dict['resid_rms'] = 50 # as the ref point would cause issues
     
     thre_dict['n_unw'] = int(n_im*thre_dict['n_unw_r'])
 

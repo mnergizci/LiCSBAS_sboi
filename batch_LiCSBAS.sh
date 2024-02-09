@@ -19,7 +19,7 @@
 start_step="01"	# 01-05, 11-16
 end_step="16"	# 01-05, 11-16
 
-cometdev='0' # shortcut to use COMET's experimental/dev functions. Now rather obsolete. Recommended: 0
+cometdev='0' # shortcut to use COMET's experimental/dev functions. At this moment, '1' will turn on the nullification. Recommended: 0
 nlook="1"	# multilook factor, used in step02
 GEOCmldir="GEOCml${nlook}"	# If start from 11 or later after doing 03-05, use e.g., GEOCml${nlook}GACOSmaskclip
 n_para="" # Number of parallel processing in step 02-05,12,13,16. default: number of usable CPU
@@ -77,10 +77,11 @@ p15_n_unw_r_thre=""	# default: 1.5
 p15_vstd_thre=""	# default: 100 mm/yr
 p15_maxTlen_thre=""	# default: 1 yr
 p15_n_gap_thre=""	# default: 10
-p15_stc_thre=""	# default: 5 mm
-p15_n_ifg_noloop_thre=""	# default: 50
+p15_stc_thre=""	# default: 10 mm
+p15_n_ifg_noloop_thre=""	# default: 500 - setting this much higher than orig since we nullify them (p13_nullify_noloops)
 p15_n_loop_err_thre=""	# default: 5
-p15_resid_rms_thre=""	# default: 2 mm
+p15_n_loop_err_ratio_thre=""	# default: 0.7 - in future we will switch to this ratio term, instead of n_loop_err
+p15_resid_rms_thre=""	# default: 50 mm, but setting much higher than orig since it depends on (automatic) ref point, must be optimised
 p16_filtwidth_km=""	# default: 2 km
 p16_filtwidth_yr=""	# default: avg_interval*3 yr
 p16_deg_deramp=""	# 1, bl, or 2. default: no deramp
@@ -401,6 +402,7 @@ if [ $start_step -le 15 -a $end_step -ge 15 ];then
   if [ ! -z $p15_stc_thre ];then p15_op="$p15_op -s $p15_stc_thre"; fi
   if [ ! -z $p15_n_ifg_noloop_thre ];then p15_op="$p15_op -i $p15_n_ifg_noloop_thre"; fi
   if [ ! -z $p15_n_loop_err_thre ];then p15_op="$p15_op -l $p15_n_loop_err_thre"; fi
+  if [ ! -z $p15_n_loop_err_ratio_thre ];then p15_op="$p15_op -L $p15_n_loop_err_ratio_thre"; fi
   if [ ! -z $p15_resid_rms_thre ];then p15_op="$p15_op -r $p15_resid_rms_thre"; fi
   if [ ! -z $p15_vmin ];then p15_op="$p15_op --vmin $p15_vmin"; fi
   if [ ! -z $p15_vmax ];then p15_op="$p15_op --vmax $p15_vmax"; fi
