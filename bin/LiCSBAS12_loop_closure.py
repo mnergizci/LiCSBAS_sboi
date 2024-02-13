@@ -323,9 +323,9 @@ def main(argv=None):
     good_ifg = []
 
     # replace .unw with .unw.ori OR REVERSE
-    if save_ori_unw:
-        print('Saving original ifg files') # this will be done through the nullification function itself
-        '''
+    #if save_ori_unw:
+    #    print('Saving original ifg files') # this will be done through the nullification function itself
+    '''
         for ifgd in ifgdates:
             unwfile_ori = os.path.join(ifgdir, ifgd, ifgd + '.unw.ori')
             unwfile = os.path.join(ifgdir, ifgd, ifgd + '.unw')
@@ -334,7 +334,7 @@ def main(argv=None):
             ### if ori already exists, we should not modify it!
             #unw = io_lib.read_img(unwfile, length, width)
             #unw.tofile(unwfile_ori)
-        '''
+    '''
     ### Parallel processing
     p = q.Pool(_n_para)
     loop_ph_rms_ifg = np.array(p.map(loop_closure_1st_wrapper, range(n_loop)), dtype=np.float32)
@@ -389,6 +389,7 @@ def main(argv=None):
 
         unwfile = os.path.join(ifgdir, ifgd, ifgd + '.unw')
         unwfile_ori = os.path.join(ifgdir, ifgd, ifgd + '.unw.ori')
+        # if the orig (i.e. before nullification) unw exists, we will use it as input
         if os.path.exists(unwfile_ori):
             unwfile = unwfile_ori
         unw = io_lib.read_img(unwfile, length, width)
@@ -1275,6 +1276,8 @@ def nullify_unw(ifgd, mask):
         shutil.copy(unwfile, unwfile_ori)
         if os.path.exists(unwfile+'.png'):
             shutil.move(unwfile+'.png', unwfile_ori+'.png')
+        if os.path.exists(unwfile+'.ras'):
+            shutil.move(unwfile+'.ras', unwfile_ori+'.ras')
     if os.path.exists(unwinfile):
         unw = io_lib.read_img(unwinfile, length, width)
         # unw[mask==False]=0  # should be ok but it appears as 0 in preview...
