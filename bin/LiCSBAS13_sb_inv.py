@@ -283,7 +283,10 @@ def main(argv=None):
             raise Usage("Wrong inversion algorithm - only LS or WLS are the options here")
         if (inv_alg == 'WLS') and (singular == True):
             raise Usage('Sorry, --singular works only with LS but you requested WLS as inversion algorithm.')
-
+        if singular or only_sb:
+            if n_para>1:
+                print('WARNING: selected non-NSBAS regime. Currently not parallelised, setting n_para=1')
+                n_para = 1
     except Usage as err:
         print("\nERROR:", file=sys.stderr, end='')
         print("  "+str(err.msg), file=sys.stderr)
