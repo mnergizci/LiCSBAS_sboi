@@ -257,7 +257,7 @@ def singular_nsbas(d,G,m,dt_cum):
             t = np.array(t)
             # is only one value ok? maybe increase the threshold here:
             if len(s)>0:
-                velpx = s.sum()/t.sum()
+                velpx = s.sum()/t.sum()    # mm/day
             else:
                 velpx = np.nan # not sure what will happen. putting 0 may be safer
             #if len(s) == 1:
