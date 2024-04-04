@@ -429,89 +429,96 @@ def main(argv=None):
     loop_ph_rms_points_masked = loop_ph_rms_points * mask1 * mask2
     loop_ph_rms_points_masked[loop_ph_rms_points_masked == 0] = np.nan
     # ML 20220330 - adding here distance from centre of scene - or from given ref coordinates
-    # this might be further updated for islands, using connected components
-    if ref_approx:
-        dempar = os.path.join(ifgdir, 'EQA.dem_par')
-        lat1 = float(io_lib.get_param_par(dempar, 'corner_lat'))  # north
-        lon1 = float(io_lib.get_param_par(dempar, 'corner_lon'))  # west
-        postlat = float(io_lib.get_param_par(dempar, 'post_lat'))  # negative
-        postlon = float(io_lib.get_param_par(dempar, 'post_lon'))  # positive
-        lat2 = lat1 + postlat * (length - 1)  # south
-        lon2 = lon1 + postlon * (width - 1)  # east
-        try:
-            if ref_approx.count('/') < 3:
-                range_geo_str = ref_approx.split('/')[0] + '/' + ref_approx.split('/')[0] + '/' + ref_approx.split('/')[
-                    1] + '/' + ref_approx.split('/')[1]
-            else:
-                range_geo_str = ref_approx
-            x1, x2, y1, y2 = tools_lib.read_range_geo(range_geo_str, width, length, lat1, postlat, lon1, postlon)
-            refnearyx = np.array([(y1 + y2) / 2, (x1 + x2) / 2]).astype(np.int16)
-        except:
-            print('error parsing lon/lat from ref coords - using centre of scene')
+    refsel_updated = False
+    if refsel_updated:
+        # this might be further updated for islands, using connected components
+        if ref_approx:
+            dempar = os.path.join(ifgdir, 'EQA.dem_par')
+            lat1 = float(io_lib.get_param_par(dempar, 'corner_lat'))  # north
+            lon1 = float(io_lib.get_param_par(dempar, 'corner_lon'))  # west
+            postlat = float(io_lib.get_param_par(dempar, 'post_lat'))  # negative
+            postlon = float(io_lib.get_param_par(dempar, 'post_lon'))  # positive
+            lat2 = lat1 + postlat * (length - 1)  # south
+            lon2 = lon1 + postlon * (width - 1)  # east
+            try:
+                if ref_approx.count('/') < 3:
+                    range_geo_str = ref_approx.split('/')[0] + '/' + ref_approx.split('/')[0] + '/' + ref_approx.split('/')[
+                        1] + '/' + ref_approx.split('/')[1]
+                else:
+                    range_geo_str = ref_approx
+                x1, x2, y1, y2 = tools_lib.read_range_geo(range_geo_str, width, length, lat1, postlat, lon1, postlon)
+                refnearyx = np.array([(y1 + y2) / 2, (x1 + x2) / 2]).astype(np.int16)
+            except:
+                print('error parsing lon/lat from ref coords - using centre of scene')
+                refnearyx = np.array(loop_ph_rms_points_masked.shape)
+                refnearyx = np.round(refnearyx / 2).astype(np.int16)
+        else:
             refnearyx = np.array(loop_ph_rms_points_masked.shape)
             refnearyx = np.round(refnearyx / 2).astype(np.int16)
-    else:
-        refnearyx = np.array(loop_ph_rms_points_masked.shape)
-        refnearyx = np.round(refnearyx / 2).astype(np.int16)
-    # get pixels with low loop errors, i.e. within 20% percentile - or should we do lower?
-    # 2022-10-12: instead of loop phase rms, choose pixel with highest coherence around given point
-    # realphrms = loop_ph_rms_points_masked
-    # calculating avg_coh here already
-    print('calculating average coherence (to be used also for ref point selection)')
-    coh_avg = np.zeros((length, width), dtype=np.float32)
-    n_coh = np.zeros((length, width), dtype=np.int16)
-    # n_unw = np.zeros((length, width), dtype=np.int16)
-    ifgdates_good = list(set(ifgdates) - set(bad_ifg))
-    for ifgd in ifgdates_good:
-        ccfile = os.path.join(ifgdir, ifgd, ifgd + '.cc')
-        if os.path.getsize(ccfile) == length * width:
-            coh = io_lib.read_img(ccfile, length, width, np.uint8)
-            coh = coh.astype(np.float32) / 255
-        else:
-            coh = io_lib.read_img(ccfile, length, width)
-            coh[np.isnan(coh)] = 0  # Fill nan with 0
+        # get pixels with low loop errors, i.e. within 20% percentile - or should we do lower?
+        # 2022-10-12: instead of loop phase rms, choose pixel with highest coherence around given point
+        # realphrms = loop_ph_rms_points_masked
+        # calculating avg_coh here already
+        print('calculating average coherence (to be used also for ref point selection)')
+        coh_avg = np.zeros((length, width), dtype=np.float32)
+        n_coh = np.zeros((length, width), dtype=np.int16)
+        # n_unw = np.zeros((length, width), dtype=np.int16)
+        ifgdates_good = list(set(ifgdates) - set(bad_ifg))
+        for ifgd in ifgdates_good:
+            ccfile = os.path.join(ifgdir, ifgd, ifgd + '.cc')
+            if os.path.getsize(ccfile) == length * width:
+                coh = io_lib.read_img(ccfile, length, width, np.uint8)
+                coh = coh.astype(np.float32) / 255
+            else:
+                coh = io_lib.read_img(ccfile, length, width)
+                coh[np.isnan(coh)] = 0  # Fill nan with 0
+    
+            coh_avg += coh
+            n_coh += (coh != 0)
+            # unwfile = os.path.join(ifgdir, ifgd, ifgd+'.unw')
+            # unw = io_lib.read_img(unwfile, length, width)
+            # unw[unw == 0] = np.nan # Fill 0 with nan
+            # n_unw += ~np.isnan(unw) # Summing number of unnan unw
 
-        coh_avg += coh
-        n_coh += (coh != 0)
-        # unwfile = os.path.join(ifgdir, ifgd, ifgd+'.unw')
-        # unw = io_lib.read_img(unwfile, length, width)
-        # unw[unw == 0] = np.nan # Fill 0 with nan
-        # n_unw += ~np.isnan(unw) # Summing number of unnan unw
-
-    coh_avg[n_coh == 0] = np.nan
-    n_coh[n_coh == 0] = 1  # to avoid zero division
-    coh_avg = coh_avg / n_coh
-    coh_avg[coh_avg == 0] = np.nan
-    #
-    # for convenience (debug, to be checked if works ok), changing this to 1/coh
-    print(
-        'Oct 2022 update: selecting ref point based on avg coh (and all in unw) instead of loop phase closure min (as it depends on prelim ref area/mean of scene)')
-    coh_ratio_masked = (1 / coh_avg) * mask1 * mask2
-    coh_ratio_masked[coh_ratio_masked == 0] = np.nan
-    percentile = 20
-    percthres = np.nanpercentile(coh_ratio_masked, percentile)
-    refyxs = np.where(coh_ratio_masked < percthres)
-    if len(refyxs[0]) < 10:
-        # decrease the limit
-        percentile = 25
+        coh_avg[n_coh == 0] = np.nan
+        n_coh[n_coh == 0] = 1  # to avoid zero division
+        coh_avg = coh_avg / n_coh
+        coh_avg[coh_avg == 0] = np.nan
+        #
+        # for convenience (debug, to be checked if works ok), changing this to 1/coh
+        print(
+            'Oct 2022 update: selecting ref point based on avg coh (and all in unw) instead of loop phase closure min (as it depends on prelim ref area/mean of scene)')
+        coh_ratio_masked = (1 / coh_avg) * mask1 * mask2
+        coh_ratio_masked[coh_ratio_masked == 0] = np.nan
+        percentile = 20
         percthres = np.nanpercentile(coh_ratio_masked, percentile)
         refyxs = np.where(coh_ratio_masked < percthres)
-    refyxs = refyxs[0] + refyxs[1] * 1j  # work in complex plane
-    refnearyx = refnearyx[0] + refnearyx[1] * 1j
-    distref = np.abs(refyxs - refnearyx)
-    # ok, let's directly weight with the loop err (this can be improved..)
-    weighted_dist = coh_ratio_masked[coh_ratio_masked < percthres] * distref
-    weighted_dist = weighted_dist.ravel()
-    try:
-        refpoint = np.nanargmin(weighted_dist)
-        refy1 = int(np.real(refyxs[refpoint]))
-        refx1 = int(np.imag(refyxs[refpoint]))
-        print('selected ref point is ' + str(distref[refpoint]) + ' px from desired location')
-    except:
-        # print('error - seems no proper points below '+str(percentile)+'% percentile of loop errors: '+str(percthres)+'. reverting to original licsbas approach')
-        # print('error - seems no proper points below '+str(percentile)+'% percentile of avg coh: '+str(percthres)+'.
-        print('error in updated refpoint selection approach. reverting to original licsbas approach')
-        # loop_ph_rms_points_masked = realphrms
+        if len(refyxs[0]) < 10:
+            # decrease the limit
+            percentile = 25
+            percthres = np.nanpercentile(coh_ratio_masked, percentile)
+            refyxs = np.where(coh_ratio_masked < percthres)
+        refyxs = refyxs[0] + refyxs[1] * 1j  # work in complex plane
+        refnearyx = refnearyx[0] + refnearyx[1] * 1j
+        distref = np.abs(refyxs - refnearyx)
+        # ok, let's directly weight with the loop err (this can be improved..)
+        weighted_dist = coh_ratio_masked[coh_ratio_masked < percthres] * distref
+        weighted_dist = weighted_dist.ravel()
+        try:
+            refpoint = np.nanargmin(weighted_dist)
+            refy1 = int(np.real(refyxs[refpoint]))
+            refx1 = int(np.imag(refyxs[refpoint]))
+            print('selected ref point is ' + str(distref[refpoint]) + ' px from desired location')
+        except:
+            # print('error - seems no proper points below '+str(percentile)+'% percentile of loop errors: '+str(percthres)+'. reverting to original licsbas approach')
+            # print('error - seems no proper points below '+str(percentile)+'% percentile of avg coh: '+str(percthres)+'.
+            print('error in updated refpoint selection approach. reverting to original licsbas approach')
+            # loop_ph_rms_points_masked = realphrms
+            refyx = np.where(loop_ph_rms_points_masked == np.nanmin(loop_ph_rms_points_masked))
+            refy1 = refyx[0][0]  # start from 0, not 1
+            refx1 = refyx[1][0]
+    else:
+        print('debug: using orig LiCSBAS approach for ref point selection')
         refyx = np.where(loop_ph_rms_points_masked == np.nanmin(loop_ph_rms_points_masked))
         refy1 = refyx[0][0]  # start from 0, not 1
         refx1 = refyx[1][0]
