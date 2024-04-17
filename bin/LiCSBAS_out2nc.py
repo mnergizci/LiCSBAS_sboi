@@ -16,7 +16,7 @@ LiCSBAS_out2nc.py [-i infile] [-o outfile] [-m yyyymmdd]
 
  -i  Path to input cum file (Default: cum_filt.h5)
  -o  Output netCDF4 file (Default: output.nc)
- -m  Master (reference) date (Default: first date)
+ -m  Master (reference) date (Default: first date) - TODO: bperps are fixed-referred to the 1st date
  --ref_geo  Reference area in geographical coordinates as: lon1/lon2/lat1/lat2
  --clip_geo  Area to clip in geographical coordinates as: lon1/lon2/lat1/lat2
  --compress, -C  use zlib compression (very small files but time series may take long to load in GIS)
@@ -90,6 +90,7 @@ def loadall2cube(cumfile):
     rmsfile = os.path.join(cumdir,'results/resid_rms')
     vstdfile = os.path.join(cumdir,'results/vstd')
     stcfile = os.path.join(cumdir,'results/stc')
+    maskfile = os.path.join(cumdir,'results/mask')
     metafile = os.path.join(cumdir,'../../metadata.txt')
     #h5datafile = 'cum.h5'
     cum = xr.load_dataset(cumfile)
@@ -154,6 +155,13 @@ def loadall2cube(cumfile):
         stcxr.attrs['unit'] = 'mm'
         cube['stc'] = stcxr
     else: print('No stc file detected, skipping')
+    if os.path.exists(maskfile):
+        infile = np.fromfile(maskfile, 'float32')
+        infile = np.nan_to_num(infile,0).astype(int)  # change nans to 0
+        maskxr = xr.DataArray(infile.reshape(sizey,sizex), coords=[lat, lon], dims=["lat", "lon"])
+        maskxr.attrs['unit'] = 'unitless'
+        cube['mask'] = maskxr
+    else: print('No mask file detected, skipping')
     # add inc_angle
     if os.path.exists(metafile):
         #a = subp.run(['grep','inc_angle', metafile], stdout=subp.PIPE)
