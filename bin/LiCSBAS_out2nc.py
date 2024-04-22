@@ -21,10 +21,8 @@ LiCSBAS_out2nc.py [-i infile] [-o outfile] [-m yyyymmdd]
  --clip_geo  Area to clip in geographical coordinates as: lon1/lon2/lat1/lat2
  --compress, -C  use zlib compression (very small files but time series may take long to load in GIS)
  --postfilter will interpolate VEL only through empty areas and filter in space
+ --apply_mask  Will apply mask to all relevant variables
  
- TODO:
- --mask  Path to mask file for ref phase calculation (Default: No mask)
-
 """
 #%% Change log
 '''
@@ -207,6 +205,7 @@ def main(argv=None):
     #refarea = []
     refarea_geo = []
     maskfile = []
+    apply_mask = False
     cliparea_geo = []
     compress = False
     postfilter = False
@@ -215,7 +214,7 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hi:o:m:r:C", ["help", "compress","postfilter","clip_geo=", "ref_geo=", "mask="])
+            opts, args = getopt.getopt(argv[1:], "hi:o:m:r:C", ["help", "compress","postfilter","clip_geo=", "ref_geo=", "apply_mask", "mask="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -248,6 +247,8 @@ def main(argv=None):
                 centre_refx, centre_refy = (minrefx+maxrefx)/2, (minrefy+maxrefy)/2
             elif o == '--mask':
                 maskfile = a
+            elif o == '--apply_mask':
+                apply_mask = True
 
         if not os.path.exists(cumfile):
             raise Usage('No {} exists! Use -i option.'.format(cumfile))
@@ -261,9 +262,16 @@ def main(argv=None):
     
     cube = loadall2cube(cumfile)
     
+    if apply_mask:
+        davars = list(cube.data_vars)
+        davars.remove('mask')
+        for vbl in davars:
+            if 'lat' in cube[vbl].coords:
+                cube[vbl] = cube[vbl].where(cube.mask==1)
+    
     #reference cum to time (first date will be 0)
     if not imd_m:
-        imd_m = cube.time.isel(time=0).astype('str')
+        imd_m = cube.time.isel(time=0).values.astype('str').split('T')[0]
     
     cube['cum'] = cube['cum'] - cube['cum'].sel(time=imd_m)
     
@@ -297,6 +305,8 @@ def main(argv=None):
     
     cube.attrs['ref_lon'] = centre_refx
     cube.attrs['ref_lat'] = centre_refy
+    # netcdf does not support boolean, so:
+    cube.attrs['filtered_version'] = cube.attrs['filtered_version']*1
     
     #only now will clip - this way the reference area can be outside the clip, if needed
     if cliparea_geo:
@@ -308,10 +318,7 @@ def main(argv=None):
     #masked = maskit(clipped)
     #masked['vel_filt'] = clipped['vel_filt']
     
-
     #masked.to_netcdf(outfile)
-
-
     #just to make sure it is written..
     #check if it does not invert data!
     cube.rio.set_spatial_dims(x_dim="lon", y_dim="lat", inplace=True)
