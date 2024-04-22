@@ -124,6 +124,7 @@ def loadall2cube(cumfile):
         else:
             firstbperp = cube['bperp'][0]
         cube['bperp'] = cube['bperp'] - firstbperp
+        cube['bperp'] = cube.bperp.astype(np.float32)
         cube.bperp.attrs['unit'] = 'm'
     except:
         print('some error loading bperp info')
