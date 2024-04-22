@@ -119,7 +119,11 @@ def loadall2cube(cumfile):
         cube['bperp'] = xr.DataArray(cum.bperp.values, coords=[time], dims=["time"])
         cube['bperp'] = cube.bperp.where(cube.bperp!=0)
         # re-ref it to the first date
-        cube['bperp'] = cube['bperp'] - cube['bperp'][0]
+        if np.isnan(cube['bperp'][0]):
+            firstbperp = 0
+        else:
+            firstbperp = cube['bperp'][0]
+        cube['bperp'] = cube['bperp'] - firstbperp
         cube.bperp.attrs['unit'] = 'm'
     except:
         print('some error loading bperp info')
@@ -155,7 +159,8 @@ def loadall2cube(cumfile):
     else: print('No stc file detected, skipping')
     if os.path.exists(maskfile):
         infile = np.fromfile(maskfile, 'float32')
-        infile = np.nan_to_num(infile,0).astype(int)  # change nans to 0
+        #infile = np.nan_to_num(infile,0).astype(int)  # change nans to 0
+        infile = np.nan_to_num(infile,0).astype(np.int8)  # change nans to 0
         maskxr = xr.DataArray(infile.reshape(sizey,sizex), coords=[lat, lon], dims=["lat", "lon"])
         maskxr.attrs['unit'] = 'unitless'
         cube['mask'] = maskxr
