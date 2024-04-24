@@ -472,7 +472,7 @@ def main(argv=None):
             else:
                 coh = io_lib.read_img(ccfile, length, width)
                 coh[np.isnan(coh)] = 0  # Fill nan with 0
-    
+
             coh_avg += coh
             n_coh += (coh != 0)
             # unwfile = os.path.join(ifgdir, ifgd, ifgd+'.unw')

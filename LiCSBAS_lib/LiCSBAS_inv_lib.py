@@ -8,6 +8,8 @@ Python3 library of time series inversion functions for LiCSBAS.
 =========
 Changelog
 =========
+20240423 ML
+ - parallelised singular
 20231101 Yasser Maghsoudi (and ML), Uni Leeds
  - changed least squares function from np to scipy.sparse for faster NSBAS inversion
 v1.5.2 20211122 Milan Lazecky, Uni Leeds
@@ -212,10 +214,13 @@ def invert_nsbas(unw, G, dt_cum, gamma, n_core, gpu, singular=False, only_sb=Fal
                 _result = p.map(censored_lstsq_slow_para_wrapper, args) #list[n_pt][length]
             else:
                 # TODO check if singular works in parallel
-                def singular_nsbas_para_wrapper(i, d=d, G=G, m=m, dt_cum=dt_cum):
-                    return singular_nsbas_onepoint(d,G,m,dt_cum, i)
+                #def singular_nsbas_para_wrapper(i, d=d, G=G, m=m, dt_cum=dt_cum):
+                #    return singular_nsbas_onepoint(d,G,m,dt_cum, i)
                 #
-                _result = p.map(singular_nsbas_para_wrapper, args)
+                #_result = p.map(singular_nsbas_para_wrapper, args)
+                from functools import partial
+                func = partial(singular_nsbas_onepoint, d, G, m, dt_cum)
+                _result = p.map(func, args)
             result[:, ~bool_pt_full] = np.array(_result).T
     if only_sb or singular:
         # SB/singular-NSBAS result matrix: based on G only, need to calculate vel, setting vconst=0
