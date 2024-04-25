@@ -237,6 +237,7 @@ def invert_nsbas(unw, G, dt_cum, gamma, n_core, gpu, singular=False, only_sb=Fal
         except:
             print('debug l 235')
             print(inc.shape)
+            print(dt_cum.shape)
             try:
                 print(cum.shape)
             except:
