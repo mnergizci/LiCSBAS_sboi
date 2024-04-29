@@ -9,7 +9,7 @@ Python3 library of time series inversion functions for LiCSBAS.
 Changelog
 =========
 20240423 ML
- - parallelised singular
+ - parallelised singular (with correct vel/vconst estimates)
 20231101 Yasser Maghsoudi (and ML), Uni Leeds
  - changed least squares function from np to scipy.sparse for faster NSBAS inversion
 v1.5.2 20211122 Milan Lazecky, Uni Leeds
@@ -182,7 +182,7 @@ def invert_nsbas(unw, G, dt_cum, gamma, n_core, gpu, singular=False, only_sb=Fal
             mask = (~np.isnan(unw_tmp))
             unw_tmp[np.isnan(unw_tmp)] = 0
         else:
-            print('using the singular approach (faster and more suitable for non-linear gap filling, but note vconst=0 and final velocities are affected by first and last samples)')
+            #print('using the singular approach (faster and more suitable for non-linear gap filling)')
             d = unw[~bool_pt_full, :].transpose()
             m = result[:, ~bool_pt_full]
         if n_core == 1:
@@ -190,19 +190,6 @@ def invert_nsbas(unw, G, dt_cum, gamma, n_core, gpu, singular=False, only_sb=Fal
                 result[:, ~bool_pt_full] = censored_lstsq_slow(Gall, unw_tmp, mask) #(n_im+1, n_pt)
             else:
                 result[:, ~bool_pt_full] = singular_nsbas(d,G,m,dt_cum)
-            '''
-            if para:
-            
-            def singular_nsbas_para_wrapper(i, d=d, G=G, m=m, dt_cum=dt_cum):
-                return singular_nsbas_onepoint(d,G,m,dt_cum, i)
-            
-            
-            args = [i for i in range(n_pt-n_pt_full)]
-            q = multi.get_context('fork')
-            p = q.Pool(n_core)
-            _result = p.map(singular_nsbas_para_wrapper, args) #list[n_pt][length]
-            result[:, ~bool_pt_full] = np.array(_result).T
-            '''
         else:
             print('  {} parallel processing'.format(n_core), flush=True)
             #
@@ -213,11 +200,6 @@ def invert_nsbas(unw, G, dt_cum, gamma, n_core, gpu, singular=False, only_sb=Fal
                 A = csc_array(Gall)  # or csr?
                 _result = p.map(censored_lstsq_slow_para_wrapper, args) #list[n_pt][length]
             else:
-                # TODO check if singular works in parallel
-                #def singular_nsbas_para_wrapper(i, d=d, G=G, m=m, dt_cum=dt_cum):
-                #    return singular_nsbas_onepoint(d,G,m,dt_cum, i)
-                #
-                #_result = p.map(singular_nsbas_para_wrapper, args)
                 from functools import partial
                 func = partial(singular_nsbas_onepoint, d, G, m, dt_cum)
                 _result = p.map(func, args)
@@ -235,20 +217,6 @@ def invert_nsbas(unw, G, dt_cum, gamma, n_core, gpu, singular=False, only_sb=Fal
             cum[0, bool_unnan_pt] = 0
             vel, vconst = calc_vel(cum.T, dt_cum)
         except:
-            import pickle
-            # Create a variable
-            myvar = [inc, cum, dt_cum]
-            # Open a file and use dump()
-            with open('debug.pkl', 'wb') as file:
-                # A new file will be created
-                pickle.dump(myvar, file)
-            print('debug l 235')
-            print(inc.shape)
-            print(dt_cum.shape)
-            try:
-                print(cum.shape)
-            except:
-                print('no cum variable')
             print('WARNING, some error getting cum/vel/vconst after non-NSBAS inversion')
             print('rolling back to simplified vel estimate (note vconst=0)')
             vel = result.sum(axis=0)/dt_cum[-1]
