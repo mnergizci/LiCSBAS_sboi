@@ -235,6 +235,13 @@ def invert_nsbas(unw, G, dt_cum, gamma, n_core, gpu, singular=False, only_sb=Fal
             cum[0, bool_unnan_pt] = 0
             vel, vconst = calc_vel(cum, dt_cum)
         except:
+            import pickle
+            # Create a variable
+            myvar = [inc, cum, dt_cum]
+            # Open a file and use dump()
+            with open('debug.pkl', 'wb') as file:
+                # A new file will be created
+                pickle.dump(myvar, file)
             print('debug l 235')
             print(inc.shape)
             print(dt_cum.shape)
