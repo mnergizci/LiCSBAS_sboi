@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.0 20200901 Milan Lazecky, Leeds Uni
+v1.05 20240420 Milan Lazecky, Leeds Uni
 
 ========
 Overview
@@ -26,6 +26,8 @@ LiCSBAS_out2nc.py [-i infile] [-o outfile] [-m yyyymmdd]
 """
 #%% Change log
 '''
+v1.05 20240420 ML
+ - fixed masking (apply_mask), improved metadata (to be improved further)
 v1.0 20200901 Milan Lazecky, Uni of Leeds
  - Original implementation
 '''
@@ -199,7 +201,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.0; date=20200904; author="M.Lazecky"
+    ver=1.05; date=20240420; author="M.Lazecky"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
