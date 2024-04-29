@@ -233,7 +233,7 @@ def invert_nsbas(unw, G, dt_cum, gamma, n_core, gpu, singular=False, only_sb=Fal
             ## Fill 1st image with 0 at unnan points from 2nd images
             bool_unnan_pt = ~np.isnan(cum[1, :])
             cum[0, bool_unnan_pt] = 0
-            vel, vconst = calc_vel(cum, dt_cum)
+            vel, vconst = calc_vel(cum.T, dt_cum)
         except:
             import pickle
             # Create a variable
