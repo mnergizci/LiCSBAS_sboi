@@ -154,6 +154,8 @@ def main(argv=None):
                 ml = int(a)
             elif o == '-g':
                 cliparea_geo = a
+            elif o == '--thres':
+                thres = a
             elif o == '--gacos':
                 gacoscorr = True
             elif o =='--filter':
