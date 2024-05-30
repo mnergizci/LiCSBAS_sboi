@@ -1225,9 +1225,8 @@ def loop_closure_4th(args, da):
         ref_unw13 = np.nanmean(unw13[refy1:refy2, refx1:refx2])
         ## Calculate loop phase taking into account ref phase
         loop_ph = unw12 + unw23 - unw13 - (ref_unw12 + ref_unw23 - ref_unw13)
-        ## Get the phase closure value (to form complex average)
-        # np.angle(np.exp(1j*A))
-        loop_ph_wrapped_avg = np.angle(np.exp(1j*loop_ph_wrapped_avg) + np.exp(1j*loop_ph) ) # summing in complex domain -> will get average angle
+        ## Summing the phase closure values -> will get average (wrapped) phase
+        loop_ph_wrapped_avg = np.angle(np.exp(1j* (loop_ph_wrapped_avg + loop_ph) ))
         one_array_loop = one_array
         one_array_loop[np.isnan(loop_ph)] = 0
         ns_loop_all.loc[:, :, ifgd12] = ns_loop_all.loc[:, :, ifgd12] + one_array_loop
