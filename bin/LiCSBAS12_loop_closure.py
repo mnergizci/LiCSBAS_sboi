@@ -1189,7 +1189,7 @@ def loop_closure_4th_wrapper(args):
     return ns_loop_err1
 
 
-# for now, without parallelism
+# version without parallelism
 def loop_closure_4th(args, da):
     #nullify_threshold = np.pi
     i0, i1 = args
@@ -1208,6 +1208,7 @@ def loop_closure_4th(args, da):
         coords=dict(y=np.arange(length), x=np.arange(width), ifgd=ifgdates))
     one_array = np.ones((length, width), dtype=np.float32)
     loop_ph_wrapped_avg = np.zeros((length, width), dtype=np.float32)
+    loop_ph_wrapped_avg_abs = np.zeros((length, width), dtype=np.float32)
     for i in range(i0, i1):
         if np.mod(i, 100) == 0:
             print("  {0:3}/{1:3}th loop...".format(i, n_loop), flush=True)
@@ -1227,6 +1228,7 @@ def loop_closure_4th(args, da):
         loop_ph = unw12 + unw23 - unw13 - (ref_unw12 + ref_unw23 - ref_unw13)
         ## Summing the phase closure values -> will get average (wrapped) phase
         loop_ph_wrapped_avg = np.angle(np.exp(1j* (loop_ph_wrapped_avg + loop_ph) ))
+        loop_ph_wrapped_avg_abs = np.angle(np.exp(1j* (loop_ph_wrapped_avg_abs + np.abs(loop_ph)) ))
         one_array_loop = one_array
         one_array_loop[np.isnan(loop_ph)] = 0
         ns_loop_all.loc[:, :, ifgd12] = ns_loop_all.loc[:, :, ifgd12] + one_array_loop
@@ -1248,9 +1250,9 @@ def loop_closure_4th(args, da):
     np.float32(loop_ph_wrapped_avg).tofile(file)
     # and create preview only for the abs (for masking)
     file = os.path.join(resultsdir, 'loop_ph_wrapped_avg_abs')
-    np.float32(np.abs(loop_ph_wrapped_avg)).tofile(file)
+    np.float32(loop_ph_wrapped_avg_abs).tofile(file)
     title = 'Average phase loop closure error (abs)'
-    plot_lib.make_im_png(np.abs(loop_ph_wrapped_avg), file + '.png', cmap_noise_r, title)
+    plot_lib.make_im_png(loop_ph_wrapped_avg_abs, file + '.png', cmap_noise_r, title)
     for i in range(i0, i1):
         if np.mod(i, 100) == 0:
             print("  {0:3}/{1:3}th loop...".format(i, n_loop), flush=True)
