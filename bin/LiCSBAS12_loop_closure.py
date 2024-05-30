@@ -429,9 +429,10 @@ def main(argv=None):
     loop_ph_rms_points_masked = loop_ph_rms_points * mask1 * mask2
     loop_ph_rms_points_masked[loop_ph_rms_points_masked == 0] = np.nan
     # ML 20220330 - adding here distance from centre of scene - or from given ref coordinates
+    # ML 2024.. - but this was further developed in LiCSBAS120, so not using it
     refsel_updated = False
     if refsel_updated:
-        # this might be further updated for islands, using connected components
+        # this might be further updated for islands, using connected components # ML 202405 - it was, see LiCSBAS120
         if ref_approx:
             dempar = os.path.join(ifgdir, 'EQA.dem_par')
             lat1 = float(io_lib.get_param_par(dempar, 'corner_lat'))  # north
@@ -1206,6 +1207,7 @@ def loop_closure_4th(args, da):
         dims=["y", "x", "ifgd"],
         coords=dict(y=np.arange(length), x=np.arange(width), ifgd=ifgdates))
     one_array = np.ones((length, width), dtype=np.float32)
+    loop_ph_wrapped_avg = np.zeros((length, width), dtype=np.float32)
     for i in range(i0, i1):
         if np.mod(i, 100) == 0:
             print("  {0:3}/{1:3}th loop...".format(i, n_loop), flush=True)
@@ -1223,12 +1225,15 @@ def loop_closure_4th(args, da):
         ref_unw13 = np.nanmean(unw13[refy1:refy2, refx1:refx2])
         ## Calculate loop phase taking into account ref phase
         loop_ph = unw12 + unw23 - unw13 - (ref_unw12 + ref_unw23 - ref_unw13)
+        ## Get the phase closure value (to form complex average)
+        # np.angle(np.exp(1j*A))
+        loop_ph_wrapped_avg = np.angle(np.exp(1j*loop_ph_wrapped_avg) + np.exp(1j*loop_ph) ) # summing in complex domain -> will get average angle
         one_array_loop = one_array
         one_array_loop[np.isnan(loop_ph)] = 0
         ns_loop_all.loc[:, :, ifgd12] = ns_loop_all.loc[:, :, ifgd12] + one_array_loop
         ns_loop_all.loc[:, :, ifgd23] = ns_loop_all.loc[:, :, ifgd23] + one_array_loop
         ns_loop_all.loc[:, :, ifgd13] = ns_loop_all.loc[:, :, ifgd13] + one_array_loop
-        ## Count number of loops with suspected unwrap error (>pi)
+        ## Count number of loops with suspected unwrap error (by default >pi)
         loop_ph[np.isnan(loop_ph)] = 0  # to avoid warning
         is_ok = np.abs(loop_ph) < nullify_threshold
         da.loc[:, :, ifgd12] = np.logical_or(da.loc[:, :, ifgd12], is_ok)
@@ -1239,6 +1244,14 @@ def loop_closure_4th(args, da):
         ns_loop_bad.loc[:, :, ifgd23] = ns_loop_bad.loc[:, :, ifgd23] + ~is_ok
         ns_loop_bad.loc[:, :, ifgd13] = ns_loop_bad.loc[:, :, ifgd13] + ~is_ok
     ns_loop_err1 = np.array(ns_loop_err1, dtype=np.int16)
+    print('storing the average loop phase closure error')
+    file = os.path.join(resultsdir, 'loop_ph_wrapped_avg')
+    np.float32(loop_ph_wrapped_avg).tofile(file)
+    # and create preview only for the abs (for masking)
+    file = os.path.join(resultsdir, 'loop_ph_wrapped_avg_abs')
+    np.float32(np.abs(loop_ph_wrapped_avg)).tofile(file)
+    title = 'Average phase loop closure error (abs)'
+    plot_lib.make_im_png(np.abs(loop_ph_wrapped_avg), file + '.png', cmap_noise_r, title)
     for i in range(i0, i1):
         if np.mod(i, 100) == 0:
             print("  {0:3}/{1:3}th loop...".format(i, n_loop), flush=True)
