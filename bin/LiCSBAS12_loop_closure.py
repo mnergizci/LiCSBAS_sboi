@@ -1246,10 +1246,10 @@ def loop_closure_4th(args, da):
         ns_loop_bad.loc[:, :, ifgd13] = ns_loop_bad.loc[:, :, ifgd13] + ~is_ok
     ns_loop_err1 = np.array(ns_loop_err1, dtype=np.int16)
     print('storing the average loop phase closure error')
-    file = os.path.join(resultsdir, 'loop_ph_wrapped_avg')
+    file = os.path.join(resultsdir, 'loop_ph_avg')
     np.float32(loop_ph_wrapped_sum/n_loop).tofile(file)
     # and create preview only for the abs (for masking)
-    file = os.path.join(resultsdir, 'loop_ph_wrapped_avg_abs')
+    file = os.path.join(resultsdir, 'loop_ph_avg_abs')
     np.float32(loop_ph_wrapped_sum_abs/n_loop).tofile(file)
     title = 'Average phase loop closure error (abs)'
     plot_lib.make_im_png(loop_ph_wrapped_sum_abs/n_loop, file + '.png', cmap_noise_r, title)
