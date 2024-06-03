@@ -313,6 +313,7 @@ def main(argv=None):
 
     bad_ifg11file = os.path.join(infodir, '11bad_ifg.txt')
     bad_ifg12file = os.path.join(infodir, '12bad_ifg.txt')
+    bad_ifg120file = os.path.join(infodir, '120bad_ifg.txt')
     # if ref point selected using LiCSBAS120:
     reffile = os.path.join(infodir, '120ref.txt')
     if not os.path.exists(reffile):
@@ -421,6 +422,10 @@ def main(argv=None):
     ### Read bad_ifg11 and 12
     bad_ifg11 = io_lib.read_ifg_list(bad_ifg11file)
     bad_ifg12 = io_lib.read_ifg_list(bad_ifg12file)
+    if os.path.exists(bad_ifg120file):
+        print('adding also ifgs listed as bad in the optional 120 step')
+        bad_ifg120 = io_lib.read_ifg_list(bad_ifg120file)
+        bad_ifg12 = list(set(bad_ifg12 + bad_ifg120))
     bad_ifg_all = list(set(bad_ifg11+bad_ifg12))
     bad_ifg_all.sort()
 
