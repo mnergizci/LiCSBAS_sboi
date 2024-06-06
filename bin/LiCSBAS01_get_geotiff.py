@@ -224,7 +224,7 @@ def main(argv=None):
     else:
         ### Get available dates
         print('Searching latest epoch for mli...', flush=True)
-        url = os.path.join(LiCSARweb, trackID, frameID, 'epochs')
+        url = os.path.join(LiCSARweb, trackID, frameID, 'epochs/')
         response = requests.get(url)
         
         response.encoding = response.apparent_encoding #avoid garble
@@ -269,7 +269,7 @@ def main(argv=None):
 
         ### Get available dates
         print('\nDownload GACOS data', flush=True)
-        url = os.path.join(LiCSARweb, trackID, frameID, 'epochs')
+        url = os.path.join(LiCSARweb, trackID, frameID, 'epochs/')
         response = requests.get(url)
         response.encoding = response.apparent_encoding #avoid garble
         html_doc = response.text
@@ -333,7 +333,7 @@ def main(argv=None):
     #%% InSAR data
     ### Get available dates
     print('\nDownload geotiff of InSAR products', flush=True)
-    url_ifgdir = os.path.join(LiCSARweb, trackID, frameID, 'interferograms')
+    url_ifgdir = os.path.join(LiCSARweb, trackID, frameID, 'interferograms/')
     response = requests.get(url_ifgdir)
     
     response.encoding = response.apparent_encoding #avoid garble
@@ -401,7 +401,7 @@ def main(argv=None):
 
         ### Get available dates
         print('\nDownload MLI data', flush=True)
-        url = os.path.join(LiCSARweb, trackID, frameID, 'epochs')
+        url = os.path.join(LiCSARweb, trackID, frameID, 'epochs/')
         response = requests.get(url)
         response.encoding = response.apparent_encoding  # avoid garble
         html_doc = response.text
