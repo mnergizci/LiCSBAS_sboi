@@ -1226,9 +1226,7 @@ def loop_closure_4th(args, da):
         ref_unw13 = np.nanmean(unw13[refy1:refy2, refx1:refx2])
         ## Calculate loop phase taking into account ref phase
         loop_ph = unw12 + unw23 - unw13 - (ref_unw12 + ref_unw23 - ref_unw13)
-        ## Summing the phase closure values -> will get average (wrapped) phase
-        loop_ph_wrapped_sum = loop_ph_wrapped_sum + np.angle(np.exp(1j* loop_ph ))
-        loop_ph_wrapped_sum_abs = loop_ph_wrapped_sum_abs + np.angle(np.exp(1j* np.abs(loop_ph)) )
+        #
         one_array_loop = one_array
         one_array_loop[np.isnan(loop_ph)] = 0
         ns_loop_all.loc[:, :, ifgd12] = ns_loop_all.loc[:, :, ifgd12] + one_array_loop
@@ -1236,6 +1234,9 @@ def loop_closure_4th(args, da):
         ns_loop_all.loc[:, :, ifgd13] = ns_loop_all.loc[:, :, ifgd13] + one_array_loop
         ## Count number of loops with suspected unwrap error (by default >pi)
         loop_ph[np.isnan(loop_ph)] = 0  # to avoid warning
+        ## Summing the phase closure values -> will get average (wrapped) phase
+        loop_ph_wrapped_sum = loop_ph_wrapped_sum + np.angle(np.exp(1j * loop_ph))
+        loop_ph_wrapped_sum_abs = loop_ph_wrapped_sum_abs + np.angle(np.exp(1j * np.abs(loop_ph)))
         is_ok = np.abs(loop_ph) < nullify_threshold
         da.loc[:, :, ifgd12] = np.logical_or(da.loc[:, :, ifgd12], is_ok)
         da.loc[:, :, ifgd23] = np.logical_or(da.loc[:, :, ifgd23], is_ok)
