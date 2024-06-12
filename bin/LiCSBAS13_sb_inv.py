@@ -75,7 +75,7 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] 
  --keep_incfile
      Not remove inc and resid files (Default: remove them)
  --gpu        Use GPU (Need cupy module)
- --singular   Use more economic (unconstrained SBAS) computation (faster and less demanding solution, but considered less precise)
+ --singular   Use more economic computation  (unconstrained SBAS with filling gaps in second step; faster and less demanding solution but should be further improved)
  --only_sb    Perform only SB processing (skipping points with NaNs)
  --nopngs     Avoid generating some (unnecessary) PNG previews of increment residuals etc.
  --no_storepatches Don't store completed patch data [default: store patches in case of job timeout]
@@ -86,6 +86,8 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] 
 """
 #%% Change log
 '''
+20240423 ML
+ - added parallelised version of 'singular' approach
 20231101 Milan Lazecky, Leeds Uni
  - option for input data in metric units
 v1.5.5 20230928 Lin Shen, Leeds Uni
@@ -285,8 +287,8 @@ def main(argv=None):
             raise Usage('Sorry, --singular works only with LS but you requested WLS as inversion algorithm.')
         if singular or only_sb:
             if n_para>1:
-                print('WARNING: selected non-NSBAS regime. Currently not parallelised, setting n_para=1')
-                n_para = 1
+                print('WARNING: selected non-NSBAS regime. Current parallelism is under testing (give feedback please)')
+                #n_para = 1
     except Usage as err:
         print("\nERROR:", file=sys.stderr, end='')
         print("  "+str(err.msg), file=sys.stderr)
@@ -311,6 +313,7 @@ def main(argv=None):
 
     bad_ifg11file = os.path.join(infodir, '11bad_ifg.txt')
     bad_ifg12file = os.path.join(infodir, '12bad_ifg.txt')
+    bad_ifg120file = os.path.join(infodir, '120bad_ifg.txt')
     # if ref point selected using LiCSBAS120:
     reffile = os.path.join(infodir, '120ref.txt')
     if not os.path.exists(reffile):
@@ -419,6 +422,10 @@ def main(argv=None):
     ### Read bad_ifg11 and 12
     bad_ifg11 = io_lib.read_ifg_list(bad_ifg11file)
     bad_ifg12 = io_lib.read_ifg_list(bad_ifg12file)
+    if os.path.exists(bad_ifg120file):
+        print('adding also ifgs listed as bad in the optional 120 step')
+        bad_ifg120 = io_lib.read_ifg_list(bad_ifg120file)
+        bad_ifg12 = list(set(bad_ifg12 + bad_ifg120))
     bad_ifg_all = list(set(bad_ifg11+bad_ifg12))
     bad_ifg_all.sort()
 

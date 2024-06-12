@@ -254,7 +254,13 @@ def main(argv=None):
     '''
     print('WARNING, 2024/01 change in DEV branch - n_loop_err_ratio is used (before nullification if done)')
     #names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err', 'resid_rms']
-    names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err_rat', 'resid_rms']
+    if os.path.exists(os.path.join(resultsdir, 'n_loop_err_rat')):
+        names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err_rat', 'resid_rms']
+    elif os.path.exists(os.path.join(resultsdir, 'n_loop_err')):
+        names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err', 'resid_rms']
+    else:
+        raise Usage('no n_loop_err information - cancelling. Please rerun step 12 or contact dev team on recommendations how to skip this step.')
+
     gt_lt = ['lt', 'lt', 'gt', 'lt', 'gt', 'gt', 'gt', 'gt', 'gt']  ## > or <
     ## gt: greater values than thre are masked
     ## lt: more little values than thre are masked (coh_avg, n_unw, maxTlen)
