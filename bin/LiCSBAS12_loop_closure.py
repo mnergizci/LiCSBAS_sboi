@@ -1255,10 +1255,11 @@ def loop_closure_4th(args, da):
     # and create preview only for the abs (for masking)
     file = os.path.join(resultsdir, 'loop_ph_avg_abs')
     #np.float32(loop_ph_wrapped_sum_abs/n_loop).tofile(file)
-    np.float32(loop_ph_wrapped_sum_abs / nonan_count).tofile(file)
+    loop_ph_avg_abs = np.abs(loop_ph_wrapped_sum_abs / nonan_count) # strange - there are negative values... fixing by abs as probably just numerical issue
+    np.float32(loop_ph_avg_abs).tofile(file)
     title = 'Average phase loop closure error (abs)'
     #plot_lib.make_im_png(loop_ph_wrapped_sum_abs/n_loop, file + '.png', cmap_noise_r, title)
-    plot_lib.make_im_png(loop_ph_wrapped_sum_abs / nonan_count, file + '.png', cmap_noise_r, title)
+    plot_lib.make_im_png(loop_ph_avg_abs, file + '.png', cmap_noise_r, title)
     for i in range(i0, i1):
         if np.mod(i, 100) == 0:
             print("  {0:3}/{1:3}th loop...".format(i, n_loop), flush=True)
