@@ -28,7 +28,7 @@ Usage
 LiCSBAS15_mask_ts.py -t tsadir [-c coh_thre] [-u n_unw_r_thre] [-v vstd_thre]
   [-T maxTlen_thre] [-g n_gap_thre] [-s stc_thre] [-i n_ifg_noloop_thre]
   [-l n_loop_err_thre] [-r resid_rms_thre] [--vmin float] [--vmax float]
-  [--keep_isolated] [--noautoadjust] [--use_coh_freq]
+  [--keep_isolated] [--noautoadjust] [--avg_phase_bias float]
 
  -t  Path to the TS_GEOCml* dir.
  -c  Threshold of coh_avg (average coherence)
@@ -44,11 +44,11 @@ LiCSBAS15_mask_ts.py -t tsadir [-c coh_thre] [-u n_unw_r_thre] [-v vstd_thre]
  -L temporary solution before we switch -l to the ratio
  -r  Threshold of resid_rms (RMS of residuals in inversion (mm))
  --v[min|max]  Min|Max value for output figure of velocity (Default: auto)
+ --avg_phase_bias  Will plot and use for masking the avg absolute phase loop closure error
  --keep_isolated  Keep (not mask) isolated pixels
                   (Default: they are masked by stc)
  --noautoadjust  Do not auto adjust threshold when all pixels are masked
                  (Default: do auto adjust)
- --use_coh_freq   Use the most frequent coherence Btemp for masking on the -c threshold (instead of the coh_avg)
 
  Default thresholds for L-band:
    C-band : -c 0.05 -u 1.5 -v 100 -T 1 -g 10 -s 5  -i 50 -l 5 -r 2
@@ -57,6 +57,8 @@ LiCSBAS15_mask_ts.py -t tsadir [-c coh_thre] [-u n_unw_r_thre] [-v vstd_thre]
 """
 #%% Change log
 '''
+20240628 ML, UoL
+ - use of avg_phase_bias
 20231121 ML, UoL
  - use of n_nullify (with -l) and ratios of both loop_err and n_nullify with -L (should be better, will move to this, but now TO_CHECK status
 v1.8.2 20211129 Milan Lazecky, Uni of Leeds
@@ -148,7 +150,7 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "ht:c:u:v:g:i:l:L:r:T:s:", ["version", "help", "vmin=", "vmax=", "use_coh_freq", "keep_isolated", "noautoadjust"])
+            opts, args = getopt.getopt(argv[1:], "ht:c:u:v:g:i:l:L:r:T:s:", ["version", "help", "vmin=", "vmax=", "avg_phase_bias=", "use_coh_freq", "keep_isolated", "noautoadjust"])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -178,12 +180,15 @@ def main(argv=None):
                 #thre_dict['n_nullify_rat'] = float(a)  # 2024/01: n_loop_err_Rat is now before nullification
             elif o == '-r':
                 thre_dict['resid_rms'] = float(a)
+            elif o == '--avg_phase_bias':
+                thre_dict['avg_phase_bias'] = float(a)
             elif o == '--vmin':
                 vmin = float(a)
             elif o == '--vmax':
                 vmax = float(a)
             elif o == '--use_coh_freq':
                 use_coh_freq = True
+                print('not used yet')
             elif o == '--keep_isolated':
                 keep_isolated = True
             elif o == '--noautoadjust':
@@ -252,19 +257,25 @@ def main(argv=None):
         # orig figure
         #names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err_rat', 'resid_rms'] # TODO: set n_loop_err_rat instead for masking!
     '''
-    print('WARNING, 2024/01 change in DEV branch - n_loop_err_ratio is used (before nullification if done)')
-    #names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err', 'resid_rms']
-    if os.path.exists(os.path.join(resultsdir, 'n_loop_err_rat')):
-        names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err_rat', 'resid_rms']
-    elif os.path.exists(os.path.join(resultsdir, 'n_loop_err')):
-        names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err', 'resid_rms']
+    if 'avg_phase_bias' in thre_dict:
+        print('Using avg_phase_bias parameter instead of n_loop_err')
+        names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'loop_ph_avg_abs', 'resid_rms']
+        units = ['', '', 'mm/yr', 'yr', '', 'mm', '', 'rad', 'mm']
     else:
-        raise Usage('no n_loop_err information - cancelling. Please rerun step 12 or contact dev team on recommendations how to skip this step.')
+        print('WARNING, 2024/01 change in DEV branch - n_loop_err_ratio is used (before nullification if done)')
+        #names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err', 'resid_rms']
+        if os.path.exists(os.path.join(resultsdir, 'n_loop_err_rat')):
+            names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err_rat', 'resid_rms']
+        elif os.path.exists(os.path.join(resultsdir, 'n_loop_err')):
+            names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err', 'resid_rms']
+        else:
+            raise Usage('no n_loop_err information - cancelling. Please rerun step 12 or contact dev team on recommendations how to skip this step.')
+        units = ['', '', 'mm/yr', 'yr', '', 'mm', '', '', 'mm']
 
     gt_lt = ['lt', 'lt', 'gt', 'lt', 'gt', 'gt', 'gt', 'gt', 'gt']  ## > or <
     ## gt: greater values than thre are masked
     ## lt: more little values than thre are masked (coh_avg, n_unw, maxTlen)
-    units = ['', '', 'mm/yr', 'yr', '', 'mm', '', '', 'mm']
+
 
     ### Get size and ref
     width = int(io_lib.get_param_par(inparmfile, 'range_samples'))
