@@ -44,7 +44,7 @@ LiCSBAS15_mask_ts.py -t tsadir [-c coh_thre] [-u n_unw_r_thre] [-v vstd_thre]
  -L temporary solution before we switch -l to the ratio
  -r  Threshold of resid_rms (RMS of residuals in inversion (mm))
  --v[min|max]  Min|Max value for output figure of velocity (Default: auto)
- --avg_phase_bias  Will plot and use for masking the avg absolute phase loop closure error
+ --avg_phase_bias  Threshold of Will plot and use for masking the avg absolute phase loop closure error
  --keep_isolated  Keep (not mask) isolated pixels
                   (Default: they are masked by stc)
  --noautoadjust  Do not auto adjust threshold when all pixels are masked
@@ -181,7 +181,7 @@ def main(argv=None):
             elif o == '-r':
                 thre_dict['resid_rms'] = float(a)
             elif o == '--avg_phase_bias':
-                thre_dict['avg_phase_bias'] = float(a)
+                thre_dict['loop_ph_avg_abs'] = float(a)
             elif o == '--vmin':
                 vmin = float(a)
             elif o == '--vmax':
@@ -257,8 +257,8 @@ def main(argv=None):
         # orig figure
         #names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err_rat', 'resid_rms'] # TODO: set n_loop_err_rat instead for masking!
     '''
-    if 'avg_phase_bias' in thre_dict:
-        print('Using avg_phase_bias parameter instead of n_loop_err')
+    if 'loop_ph_avg_abs' in thre_dict:
+        print('Using loop_ph_avg_abs parameter instead of n_loop_err')
         names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'loop_ph_avg_abs', 'resid_rms']
         units = ['', '', 'mm/yr', 'yr', '', 'mm', '', 'rad', 'mm']
     else:
