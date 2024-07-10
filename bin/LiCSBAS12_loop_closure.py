@@ -1209,6 +1209,7 @@ def loop_closure_4th(args, da):
     one_array = np.ones((length, width), dtype=np.float32)
     loop_ph_wrapped_sum = np.zeros((length, width), dtype=np.float32)
     loop_ph_wrapped_sum_abs = np.zeros((length, width), dtype=np.float32)
+    nonan_count = np.zeros((length, width), dtype=np.int8)
     for i in range(i0, i1):
         if np.mod(i, 100) == 0:
             print("  {0:3}/{1:3}th loop...".format(i, n_loop), flush=True)
@@ -1233,6 +1234,7 @@ def loop_closure_4th(args, da):
         ns_loop_all.loc[:, :, ifgd23] = ns_loop_all.loc[:, :, ifgd23] + one_array_loop
         ns_loop_all.loc[:, :, ifgd13] = ns_loop_all.loc[:, :, ifgd13] + one_array_loop
         ## Count number of loops with suspected unwrap error (by default >pi)
+        nonan_count = nonan_count + 1 * (~np.isnan(loop_ph))
         loop_ph[np.isnan(loop_ph)] = 0  # to avoid warning
         ## Summing the phase closure values -> will get average (wrapped) phase
         loop_ph_wrapped_sum = loop_ph_wrapped_sum + np.angle(np.exp(1j * loop_ph))
@@ -1248,12 +1250,16 @@ def loop_closure_4th(args, da):
     ns_loop_err1 = np.array(ns_loop_err1, dtype=np.int16)
     print('storing the average loop phase closure error')
     file = os.path.join(resultsdir, 'loop_ph_avg')
-    np.float32(loop_ph_wrapped_sum/n_loop).tofile(file)
+    #np.float32(loop_ph_wrapped_sum/n_loop).tofile(file)
+    np.float32(loop_ph_wrapped_sum / nonan_count).tofile(file)
     # and create preview only for the abs (for masking)
     file = os.path.join(resultsdir, 'loop_ph_avg_abs')
-    np.float32(loop_ph_wrapped_sum_abs/n_loop).tofile(file)
+    #np.float32(loop_ph_wrapped_sum_abs/n_loop).tofile(file)
+    loop_ph_avg_abs = np.abs(loop_ph_wrapped_sum_abs / nonan_count) # strange - there are negative values... fixing by abs as probably just numerical issue
+    np.float32(loop_ph_avg_abs).tofile(file)
     title = 'Average phase loop closure error (abs)'
-    plot_lib.make_im_png(loop_ph_wrapped_sum_abs/n_loop, file + '.png', cmap_noise_r, title)
+    #plot_lib.make_im_png(loop_ph_wrapped_sum_abs/n_loop, file + '.png', cmap_noise_r, title)
+    plot_lib.make_im_png(loop_ph_avg_abs, file + '.png', cmap_noise_r, title)
     for i in range(i0, i1):
         if np.mod(i, 100) == 0:
             print("  {0:3}/{1:3}th loop...".format(i, n_loop), flush=True)
