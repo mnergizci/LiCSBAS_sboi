@@ -240,7 +240,7 @@ def main(argv=None):
         for i, imd in enumerate(reversed(_imdates)):
             if np.mod(i, 10) == 0:
                 print("\r  {0:3}/{1:3}".format(i, len(_imdates)), end='', flush=True)
-            url_epoch = os.path.join(url, imd)
+            url_epoch = os.path.join(url, imd+'/')
             response = requests.get(url_epoch)
             response.encoding = response.apparent_encoding #avoid garble
             html_doc = response.text
@@ -477,7 +477,7 @@ def main(argv=None):
 def download_wrapper(args):
     i, ifgd, n_dl, url_data, path_data = args
     dir_data = os.path.dirname(path_data)
-    print('  Donwnloading {} ({}/{})...'.format(ifgd, i+1, n_dl), flush=True)
+    print('  Downloading {} ({}/{})...'.format(ifgd, i+1, n_dl), flush=True)
     if not os.path.exists(dir_data): os.mkdir(dir_data)
     tools_lib.download_data(url_data, path_data)
     return
