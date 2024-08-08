@@ -444,7 +444,7 @@ def main(argv=None):
         with open(reffile120, "r") as f:
             refarea = f.read().split()[0]  #str, x1/x2/y1/y2
         refx1, refx2, refy1, refy2 = [int(s) for s in re.split('[:/]', refarea)]
-    else
+    else:
         # ML 20220330 - adding here distance from centre of scene - or from given ref coordinates
         # ML 2024.. - but this was further developed in LiCSBAS120, so not using it
         refsel_updated = False
