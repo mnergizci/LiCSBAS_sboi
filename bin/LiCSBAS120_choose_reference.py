@@ -330,8 +330,10 @@ def discard_ifg_with_all_nans_at_ref():
     ### Check ref exist in unw. If not, list as noref_ifg
     noref_ifg = []
     for ifgd in ifgdates:
-
-        unwfile = os.path.join(ifgdir, ifgd, ifgd+'.unw')
+        # add about ori:
+        unwfile = os.path.join(ifgdir, ifgd, ifgd+'.unw.ori')
+        if not os.path.exists(unwfile):
+            unwfile = os.path.join(ifgdir, ifgd, ifgd+'.unw')
         unw_data = io_lib.read_img(unwfile, length, width)
         unw_ref = unw_data[refy1:refy2, refx1:refx2]
 
