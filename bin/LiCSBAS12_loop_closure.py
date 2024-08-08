@@ -114,6 +114,7 @@ v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
 from LiCSBAS_meta import *
 import getopt
 import os
+import re
 import sys
 import time
 import shutil
