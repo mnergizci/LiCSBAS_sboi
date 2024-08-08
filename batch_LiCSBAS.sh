@@ -7,12 +7,16 @@
 #                                         04: LiCSBAS04op_mask_unw.py (optional)
 #                                         05: LiCSBAS05op_clip_unw.py (optional)
 #  11: LiCSBAS11_check_unw.py
+#  (optional) 120: LiCSBAS120_choose_reference.py   - RECOMMENDED, especially if nullification is used, thus added to cometdev
 #  12: LiCSBAS12_loop_closure.py
 #  13: LiCSBAS13_sb_inv.py
 #  14: LiCSBAS14_vel_std.py
 #  15: LiCSBAS15_mask_ts.py
 #  16: LiCSBAS16_filt_ts.py
 
+#
+# Status of COMET dev version - the experimental functions are turned on with 
+#
 #################
 ### Settings ####
 #################
@@ -64,6 +68,7 @@ p01_get_mli="n" # y/n
 p11_unw_thre=""	# default: 0.3
 p11_coh_thre=""	# default: 0.05
 p11_s_param="n" # y/n
+p120_use="n"  # y/n
 p12_loop_thre=""	# default: 1.5 rad. With --nullify, recommended higher value (as this is an average over the whole scene)
 p12_multi_prime="y"	# y/n. y recommended
 p12_nullify="" # y/n. y recommended
@@ -114,6 +119,7 @@ p05_outGEOCmldir_suffix="" # default: clip
 p05_n_para=$n_para   # default: # of usable CPU
 p11_GEOCmldir=""	# default: $GEOCmldir
 p11_TSdir=""	# default: TS_$GEOCmldir
+p120_ignoreconncomp="n" # y/n
 p12_GEOCmldir=""        # default: $GEOCmldir
 p12_TSdir=""    # default: TS_$GEOCmldir
 p12_n_para=$n_para	# default: # of usable CPU
@@ -317,6 +323,22 @@ if [ $start_step -le 11 -a $end_step -ge 11 ];then
 fi
 
 if [ $start_step -le 12 -a $end_step -ge 12 ];then
+  if [ $cometdev -eq 1 ]; then
+    p120_use='y'
+  fi
+  if [ $p120_use == "y" ]; then
+    dirset="-c $p12_GEOCmldir -d $p12_GEOCmldir -t $p12_TSdir "
+    extra=""
+    if [ $p120_ignoreconncomp == "y" ]; then
+        extra="--ignore_comp"
+    fi
+    if [ $check_only == "y" ];then
+      echo "LiCSBAS120_choose_reference.py $dirset "$extra
+    else
+      LiCSBAS120_choose_reference.py $dirset $extra 2>&1 | tee -a $log
+      if [ ${PIPESTATUS[0]} -ne 0 ];then exit 1; fi
+    fi
+  fi
   p12_op=""
   if [ ! -z $p12_GEOCmldir ];then p12_op="$p12_op -d $p12_GEOCmldir"; 
     else p12_op="$p12_op -d $GEOCmldir"; fi
@@ -328,14 +350,14 @@ if [ $start_step -le 12 -a $end_step -ge 12 ];then
   if [ ! -z $p12_rm_ifg_list ];then p12_op="$p12_op --rm_ifg_list $p12_rm_ifg_list"; fi
   if [ ! -z $p12_n_para ];then p12_op="$p12_op --n_para $p12_n_para";
   elif [ ! -z $n_para ];then p12_op="$p12_op --n_para $n_para";fi
-  if [ $check_only == "y" ];then
-    echo "LiCSBAS12_loop_closure.py $p12_op"
-  else
-    if [ $cometdev -eq 1 ]; then
+  if [ $cometdev -eq 1 ]; then
      extra='--nullify'
     else
      extra=''
-    fi
+  fi
+  if [ $check_only == "y" ];then
+    echo "LiCSBAS12_loop_closure.py $p12_op "$extra
+  else
     LiCSBAS12_loop_closure.py $extra $p12_op 2>&1 | tee -a $log
     if [ ${PIPESTATUS[0]} -ne 0 ];then exit 1; fi
   fi
