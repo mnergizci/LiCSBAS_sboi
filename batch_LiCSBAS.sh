@@ -327,7 +327,7 @@ if [ $start_step -le 12 -a $end_step -ge 12 ];then
     p120_use='y'
   fi
   if [ $p120_use == "y" ]; then
-    dirset="-c $p12_GEOCmldir -d $p12_GEOCmldir -t $p12_TSdir "
+    dirset="-c $GEOCmldir -d $GEOCmldir -t $TSdir "
     extra=""
     if [ $p120_ignoreconncomp == "y" ]; then
         extra="--ignore_comp"
