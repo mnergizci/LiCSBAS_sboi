@@ -227,6 +227,20 @@ def read_ifg_list(ifg_listfile):
     return ifgdates
 
 
+def read_epochlist(txtfile):
+    f = open(txtfile)
+    line = f.readline()
+    out = []
+    while line:
+        if (line[0] == "2") or (line[0] == "1"):
+            out.append(str(line))
+            line = f.readline()
+        else:
+            line = f.readline()
+            continue
+    return out
+
+
 #%%
 def get_param_par(mlipar, field):
     """
