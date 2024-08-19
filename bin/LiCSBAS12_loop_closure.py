@@ -1209,22 +1209,26 @@ def loop_closure_4th_wrapper(args):
 
 # version without parallelism
 def loop_closure_4th(args, da):
+    ''' This function tries to identify loop closure errors related to a given ifg.
+        Indeed, this has two steps resulting in updated da, so the first step might be paralelised.
+        However... the parallelism would construct large datacubes of lines X pixels X noifgs that then would get merged
+        So I (ML) instead leave this to one processor only, trying to save memory
+    '''
     #nullify_threshold = np.pi
     i0, i1 = args
     n_loop = Aloop.shape[0]
-    ns_loop_err1 = np.zeros((length, width), dtype=np.int16)
-    A = np.zeros((length, width, len(ifgdates)), dtype=np.float32)
-    B = np.zeros((length, width, len(ifgdates)), dtype=np.float32)
+    ns_loop_err1 = np.zeros((length, width), dtype=np.uint8)
+    A = np.zeros((length, width, len(ifgdates)), dtype=np.int8)
+    B = np.zeros((length, width, len(ifgdates)), dtype=np.int8)
     ns_loop_all = xr.DataArray(
         data=A,
         dims=["y", "x", "ifgd"],
         coords=dict(y=np.arange(length), x=np.arange(width), ifgd=ifgdates))
-
     ns_loop_bad = xr.DataArray(
         data=B,
         dims=["y", "x", "ifgd"],
         coords=dict(y=np.arange(length), x=np.arange(width), ifgd=ifgdates))
-    one_array = np.ones((length, width), dtype=np.float32)
+    one_array = np.ones((length, width), dtype=np.int8)
     loop_ph_wrapped_sum = np.zeros((length, width), dtype=np.float32)
     loop_ph_wrapped_sum_abs = np.zeros((length, width), dtype=np.float32)
     nonan_count = np.zeros((length, width), dtype=np.int8)
@@ -1234,7 +1238,7 @@ def loop_closure_4th(args, da):
         ### Read unw
         unw12, unw23, unw13, ifgd12, ifgd23, ifgd13 = loop_lib.read_unw_loop_ph(Aloop[i, :], ifgdates, ifgdir, length,
                                                                                 width)
-
+        #
         ### Skip if bad ifg is included
         if ifgd12 in bad_ifg_all or ifgd23 in bad_ifg_all or ifgd13 in bad_ifg_all:
             # print('skipping '+ifgd13)
@@ -1246,13 +1250,13 @@ def loop_closure_4th(args, da):
         ## Calculate loop phase taking into account ref phase
         loop_ph = unw12 + unw23 - unw13 - (ref_unw12 + ref_unw23 - ref_unw13)
         #
-        one_array_loop = one_array
+        one_array_loop = one_array.copy()
         one_array_loop[np.isnan(loop_ph)] = 0
         ns_loop_all.loc[:, :, ifgd12] = ns_loop_all.loc[:, :, ifgd12] + one_array_loop
         ns_loop_all.loc[:, :, ifgd23] = ns_loop_all.loc[:, :, ifgd23] + one_array_loop
         ns_loop_all.loc[:, :, ifgd13] = ns_loop_all.loc[:, :, ifgd13] + one_array_loop
         ## Count number of loops with suspected unwrap error (by default >pi)
-        nonan_count = nonan_count + 1 * (~np.isnan(loop_ph))
+        nonan_count = nonan_count + (1 * (~np.isnan(loop_ph))).astype(np.int8)
         loop_ph[np.isnan(loop_ph)] = 0  # to avoid warning
         ## Summing the phase closure values -> will get average (wrapped) phase
         loop_ph_wrapped_sum = loop_ph_wrapped_sum + np.angle(np.exp(1j * loop_ph))
@@ -1261,11 +1265,11 @@ def loop_closure_4th(args, da):
         da.loc[:, :, ifgd12] = np.logical_or(da.loc[:, :, ifgd12], is_ok)
         da.loc[:, :, ifgd23] = np.logical_or(da.loc[:, :, ifgd23], is_ok)
         da.loc[:, :, ifgd13] = np.logical_or(da.loc[:, :, ifgd13], is_ok)
-        ns_loop_err1 = ns_loop_err1 + ~is_ok  # suspected unw error
-        ns_loop_bad.loc[:, :, ifgd12] = ns_loop_bad.loc[:, :, ifgd12] + ~is_ok
-        ns_loop_bad.loc[:, :, ifgd23] = ns_loop_bad.loc[:, :, ifgd23] + ~is_ok
-        ns_loop_bad.loc[:, :, ifgd13] = ns_loop_bad.loc[:, :, ifgd13] + ~is_ok
-    ns_loop_err1 = np.array(ns_loop_err1, dtype=np.int16)
+        ns_loop_err1 = ns_loop_err1 + (1 * ~is_ok).astype(np.uint8)  # suspected unw error
+        ns_loop_bad.loc[:, :, ifgd12] = ns_loop_bad.loc[:, :, ifgd12] + (1 * ~is_ok).astype(np.int8)
+        ns_loop_bad.loc[:, :, ifgd23] = ns_loop_bad.loc[:, :, ifgd23] + (1 * ~is_ok).astype(np.int8)
+        ns_loop_bad.loc[:, :, ifgd13] = ns_loop_bad.loc[:, :, ifgd13] + (1 * ~is_ok).astype(np.int8)
+    #ns_loop_err1 = np.array(ns_loop_err1, dtype=np.int16)
     print('storing the average loop phase closure error')
     file = os.path.join(resultsdir, 'loop_ph_avg')
     #np.float32(loop_ph_wrapped_sum/n_loop).tofile(file)
@@ -1278,6 +1282,9 @@ def loop_closure_4th(args, da):
     title = 'Average phase loop closure error (abs)'
     #plot_lib.make_im_png(loop_ph_wrapped_sum_abs/n_loop, file + '.png', cmap_noise_r, title)
     plot_lib.make_im_png(loop_ph_avg_abs, file + '.png', cmap_noise_r, title)
+    #
+    # Lin Shen update ---- WARNING / TODO: 
+    print('Updating the loop closure error matrix - identifying (in)correct ifgs')
     for i in range(i0, i1):
         if np.mod(i, 100) == 0:
             print("  {0:3}/{1:3}th loop...".format(i, n_loop), flush=True)
