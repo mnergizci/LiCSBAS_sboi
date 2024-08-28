@@ -143,6 +143,13 @@ p16_nomask="n"	# y/n. default: n
 p16_n_para=$n_para   # default: # of usable CPU
 
 
+# cometdev
+if [ $cometdev -gt 0 ]; then
+    # using --singular, so setting to simple LS instead of WLS
+    p13_inv_alg="LS"
+fi
+
+
 #############################
 ### Run (No need to edit) ###
 #############################
