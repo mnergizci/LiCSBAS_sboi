@@ -56,7 +56,7 @@ Outputs in TS_GEOCml*/ :
 Usage
 =====
 LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] [--gamma float] [--n_para int] [--n_unw_r_thre float] [--keep_incfile] [--gpu] [--singular] [--only_sb] [--nopngs]
-                   [--no_storepatches] [--load_patches] [--nullify_noloops]
+                 [--no_storepatches] [--load_patches] [--nullify_noloops]
 
  -d  Path to the GEOCml* dir containing stack of unw data
  -t  Path to the output TS_GEOCml* dir.
@@ -84,6 +84,13 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] 
  --nullify_noloops   Nullifies data from ifgs not included in any loop BEFORE NULLIFICATION (if happened)
  --nullify_noloops_use_data_after_nullification  Just to test, will probably remove this
 """
+'''
+skipping here as will do it as post-processing:
+[--step_events eventepochs.txt]
+ --step_events eventepochs.txt  Add inversion offset/steps at given epoch dates (read from eventepochs.txt in form of YYYYMMDD per line)
+ 20240717 ML
+ - adding --step_events functionality
+'''
 #%% Change log
 '''
 20240423 ML
@@ -179,7 +186,7 @@ def main(argv=None):
     ## For parallel processing
     global n_para_gap, G, Aloop, unwpatch, unwpatch_ori, imdates, incdir, ifgdir, length, width,\
         coef_r2m, ifgdates, ref_unw, cycle, keep_incfile, resdir, restxtfile, \
-        cmap_vel, cmap_wrap, wavelength, nullify_noloops
+        cmap_vel, cmap_wrap, wavelength, nullify_noloops #, step_events
 
 
     #%% Set default
@@ -219,7 +226,7 @@ def main(argv=None):
     compress = 'gzip'
     store_patches = True
     load_patches = False
-
+    #step_events = False
 
     #%% Read options
     try:
@@ -228,6 +235,7 @@ def main(argv=None):
                                        ["help",  "mem_size=", "input_units=", "gamma=",
                                         "n_unw_r_thre=", "keep_incfile", "nopngs", "nullify_noloops", "nullify_noloops_use_data_after_nullification",
                                         "inv_alg=", "n_para=", "gpu", "singular", "only_sb", "no_storepatches", "load_patches"])
+                                      #  "step_events="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -256,6 +264,9 @@ def main(argv=None):
                 gpu = True
             elif o == '--singular':
                 singular = True
+            #elif o == '--step_events':
+            #    step_events = True
+            #    stepevents_file = a
             elif o == '--only_sb':
                 only_sb = True
             elif o == '--nopngs':
@@ -289,6 +300,14 @@ def main(argv=None):
             if n_para>1:
                 print('WARNING: selected non-NSBAS regime. Current parallelism is under testing (give feedback please)')
                 #n_para = 1
+        #if step_events:
+        #    if os.path.exists(stepevents_file):
+        #        step_events = io_lib.read_epochlist(stepevents_file)
+        #        if len(step_events)==0:
+        #            print('WARNING, no step events provided. Cancelling step_events inversion routine')
+        #            step_events = False
+        #    else:
+        #        raise Usage('The provided step events file does not exist.')
     except Usage as err:
         print("\nERROR:", file=sys.stderr, end='')
         print("  "+str(err.msg), file=sys.stderr)
@@ -556,6 +575,7 @@ def main(argv=None):
         if np.all(np.isnan(unw)):
             print('All nan in ref area in {}.'.format(ifgd))
             print('Rerun LiCSBAS12.')
+            f.close()
             return 1
 
         ref_unw.append(np.nanmean(unw))
@@ -721,6 +741,7 @@ def main(argv=None):
 
             ### Recalculate no-loop ifgs info to remove them - use only the 'ori files', i.e. before nullification. If no ori, we'll use the unw files (then unwpatch_ori = unwpatch)
             if nullify_noloops and not nullify_noloops_use_data_after_nullification:
+                print('Nullifying noloop ifgs')
                 try:
                     # step 2 for nullify_noloops: load the unw files
                     for i, ifgd in enumerate(ifgdates):
@@ -916,7 +937,6 @@ def main(argv=None):
                 ## Last (n_im th) image. 1 gap means interpolated
                 cum_patch[-1, :][gap_patch[-1, :]==1] = np.nan
 
-
             #%% Fill by np.nan if n_pt_unnan == 0
             else:
                 cum_patch = np.zeros((n_im, n_pt_all), dtype=np.float32)*np.nan
@@ -941,6 +961,8 @@ def main(argv=None):
             if store_patches and not save_mem:
                 with open(cumfile, 'w') as f:
                     cum.tofile(f)
+
+            print('   Saving processing results')
 
             ### Others
             openmode = 'w' if rows[0] == 0 else 'a' #w only 1st patch
@@ -1083,7 +1105,7 @@ def main(argv=None):
     cmaps = [cmap_vel, cmap_vel, cmap_noise_r, cmap_noise_r, cmap_noise_r, cmap_noise]
     titles = ['Velocity (mm/yr)', 'Intercept of velocity (mm)', 'RMS of residual (mm)', 'Number of gaps in SB network', 'Number of ifgs with no loops', 'Max length of connected SB network (yr)']
 
-    print('\nOutput noise png images...', flush=True)
+    print('\nOutput results and noise png images...', flush=True)
     for i in range(len(names)):
         file = os.path.join(resultsdir, names[i])
         data = io_lib.read_img(file, length, width)
