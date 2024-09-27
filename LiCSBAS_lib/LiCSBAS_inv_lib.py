@@ -307,6 +307,8 @@ def censored_lstsq_slow_para_wrapper(i):
         X = sparselsq(A[m], unw_tmp[m, i], atol=1e-05, btol=1e-05)[0]
     except:
         X = np.zeros((Gall.shape[1]), dtype=np.float32)*np.nan
+        print('Warning: error during sparselsq - setting to nan')
+        print('')
     return X
 
 
@@ -735,6 +737,7 @@ def censored_lstsq_slow(A, B, M):
     # 20231101 update - not tested
     #A = csr_matrix(A) # or csc?
     A = csc_array(A) # or csr?
+    errs = 0
     for i in range(B.shape[1]):
         if np.mod(i, 100) == 0:
              print('\r  Running {0:6}/{1:6}th point...'.format(i, B.shape[1]), end='', flush=True)
@@ -745,7 +748,10 @@ def censored_lstsq_slow(A, B, M):
             # 20231101 update
             X[:, i] = sparselsq(A[m], B[m, i], atol=1e-05, btol=1e-05)[0]
         except:
+            errs = errs+1
             X[:,i] = np.nan
-
     print('')
+    if errs > 0:
+        print('Warning: '+str(errs)+' errors occurred during sparselsq (-> nan increments)')
+        print('')
     return X
