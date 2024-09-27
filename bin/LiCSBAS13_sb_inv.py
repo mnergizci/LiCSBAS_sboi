@@ -740,28 +740,32 @@ def main(argv=None):
             unwpatch = unwpatch.reshape((n_ifg, n_pt_all)).transpose() #(n_pt_all, n_ifg)
 
             ### Recalculate no-loop ifgs info to remove them - use only the 'ori files', i.e. before nullification. If no ori, we'll use the unw files (then unwpatch_ori = unwpatch)
-            if nullify_noloops and not nullify_noloops_use_data_after_nullification:
+            if nullify_noloops:
                 print('Nullifying noloop ifgs')
-                try:
-                    # step 2 for nullify_noloops: load the unw files
-                    for i, ifgd in enumerate(ifgdates):
-                        unwfile_ori = os.path.join(ifgdir, ifgd, ifgd + '.unw.ori')
-                        if not os.path.exists(unwfile_ori):
-                            # only fixed unw data would keep the originals (ori)
-                            unwfile_ori = os.path.join(ifgdir, ifgd, ifgd + '.unw')
-                        f = open(unwfile_ori, 'rb')
-                        f.seek(countf * 4, os.SEEK_SET)  # Seek for >=2nd patch, 4 means byte
-                        unw_ori = np.fromfile(f, dtype=np.float32, count=countl).reshape((lengththis, width))  #* coef_r2m
-                        unw_ori[unw_ori == 0] = np.nan  # Fill 0 with nan
-                        #unw_ori[~np.isnan(unw_ori)] = 1 # fill everything else with 1
-                        ## unw_ori = unw_ori - ref_unw_ori[i]   # no need for the check here
-                        unwpatch_ori[i] = unw_ori #.astype(np.int8)  # but then we lose the nans again, so will need to change the last function.. maybe later
-                        f.close()
-                    unwpatch_ori = unwpatch_ori.reshape((n_ifg, n_pt_all)).transpose()
-                except:
-                    print("Some error loading unw data, skipping the nullify_noloops routine", flush=True)
-                    nullify_noloops = False
 
+                if not nullify_noloops_use_data_after_nullification:
+                    print('(from data before loop phase closure error nullification if done in step 12)')
+                    try:
+                        # step 2 for nullify_noloops: load the unw files
+                        for i, ifgd in enumerate(ifgdates):
+                            unwfile_ori = os.path.join(ifgdir, ifgd, ifgd + '.unw.ori')
+                            if not os.path.exists(unwfile_ori):
+                                # only fixed unw data would keep the originals (ori)
+                                unwfile_ori = os.path.join(ifgdir, ifgd, ifgd + '.unw')
+                            f = open(unwfile_ori, 'rb')
+                            f.seek(countf * 4, os.SEEK_SET)  # Seek for >=2nd patch, 4 means byte
+                            unw_ori = np.fromfile(f, dtype=np.float32, count=countl).reshape((lengththis, width))  #* coef_r2m
+                            unw_ori[unw_ori == 0] = np.nan  # Fill 0 with nan
+                            #unw_ori[~np.isnan(unw_ori)] = 1 # fill everything else with 1
+                            ## unw_ori = unw_ori - ref_unw_ori[i]   # no need for the check here
+                            unwpatch_ori[i] = unw_ori #.astype(np.int8)  # but then we lose the nans again, so will need to change the last function.. maybe later
+                            f.close()
+                        unwpatch_ori = unwpatch_ori.reshape((n_ifg, n_pt_all)).transpose()
+                    except:
+                        print("Some error loading unw data, skipping the nullify_noloops routine", flush=True)
+                        nullify_noloops = False
+                else:
+                    print('(from data after loop phase closure error nullification if done in step 12)')
 
             # if still ok, perform the main noloop routine
             #n_para_gap = n_para
@@ -1145,6 +1149,8 @@ def count_gaps_wrapper(i):
 
     ### n_gap and gap location
 #    ns_unw_unnan4inc = (np.matmul(np.int8(G[:, :, None]), (~np.isnan(unwpatch.T))[:, None, :])).sum(axis=0, dtype=np.int16) #n_ifg, n_im-1, n_pt -> n_im-1, n_pt
+    print('')
+    print('patch '+str(i)+', step 1/3: gaps identification')
     ns_unw_unnan4inc = np.array([(G[:, j]*
                           (~np.isnan(unwpatch[i*n_pt_patch:(i+1)*n_pt_patch])))
                          .sum(axis=1, dtype=np.int16) for j in range(n_im-1)])
@@ -1158,6 +1164,7 @@ def count_gaps_wrapper(i):
     # n_ifg*(n_pt,n_ifg)->(n_loop,n_pt)
     # Number of ifgs for each loop at eath point.
     # 3 means complete loop, 1 or 2 means broken loop.
+    print('patch ' + str(i) + ', step 2/3: n_ifg_noloop')
     ns_ifg4loop = np.array([(np.abs(Aloop[j, :])*
                          (~np.isnan(unwpatch[i*n_pt_patch:(i+1)*n_pt_patch])))
                             .sum(axis=1) for j in range(n_loop)])
@@ -1166,12 +1173,14 @@ def count_gaps_wrapper(i):
 
     # n_loop*(n_loop,n_pt)*n_pt->(n_ifg,n_pt)
     # Number of loops for each ifg at eath point.
+    print('patch ' + str(i) + ', step 3/3: n_loop per each ifg at each point')
     ns_loop4ifg = np.array([(
             (np.abs(Aloop[:, j])*bool_loop.T).T*
             (~np.isnan(unwpatch[i*n_pt_patch:(i+1)*n_pt_patch, j]))
             ).sum(axis=0) for j in range(n_ifg)]) #
     del bool_loop
-
+    
+    print('patch ' + str(i) + ': indices calculated')
     ns_ifg_noloop_tmp = (ns_loop4ifg==0).sum(axis=0) #n_pt
     del ns_loop4ifg
 
