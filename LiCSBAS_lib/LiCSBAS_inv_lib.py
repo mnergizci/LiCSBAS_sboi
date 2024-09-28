@@ -51,6 +51,9 @@ except:
     print('not loading RANSAC (optional experimental function)')
 
 
+debugmode = True
+print('inversion runs in debug mode - please inform Milan if this works now')
+
 #%%
 def make_sb_matrix(ifgdates):
     """
@@ -197,7 +200,10 @@ def invert_nsbas(unw, G, dt_cum, gamma, n_core, gpu, singular=False, only_sb=Fal
             q = multi.get_context('fork')
             p = q.Pool(n_core)
             if not singular:
-                A = csc_array(Gall)  # or csr?
+                if debugmode:
+                    A = Gall
+                else:
+                    A = csc_array(Gall)  # or csr?
                 _result = p.map(censored_lstsq_slow_para_wrapper, args) #list[n_pt][length]
             else:
                 from functools import partial
@@ -736,7 +742,8 @@ def censored_lstsq_slow(A, B, M):
     X = np.empty((A.shape[1], B.shape[1]))
     # 20231101 update - not tested
     #A = csr_matrix(A) # or csc?
-    A = csc_array(A) # or csr?
+    if not debugmode:
+        A = csc_array(A) # or csr?
     errs = 0
     for i in range(B.shape[1]):
         if np.mod(i, 100) == 0:
