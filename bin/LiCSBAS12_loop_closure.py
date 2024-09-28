@@ -1260,7 +1260,7 @@ def loop_closure_4th(args, da):
         loop_ph[np.isnan(loop_ph)] = 0  # to avoid warning
         ## Summing the phase closure values -> will get average (wrapped) phase
         loop_ph_wrapped_sum = loop_ph_wrapped_sum + np.angle(np.exp(1j * loop_ph))
-        loop_ph_wrapped_sum_abs = loop_ph_wrapped_sum_abs + np.angle(np.exp(1j * np.abs(loop_ph)))
+        loop_ph_wrapped_sum_abs = loop_ph_wrapped_sum_abs + np.abs(np.angle(np.exp(1j * loop_ph)))
         is_ok = np.abs(loop_ph) < nullify_threshold
         da.loc[:, :, ifgd12] = np.logical_or(da.loc[:, :, ifgd12], is_ok)
         da.loc[:, :, ifgd23] = np.logical_or(da.loc[:, :, ifgd23], is_ok)
