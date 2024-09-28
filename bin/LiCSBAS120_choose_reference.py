@@ -38,6 +38,13 @@ Usage
 =====
 LiCSBAS120_choose_reference.py [-h] [-f FRAME_DIR] [-g UNW_DIR] [-t TS_DIR] [-w WIN] [-r [0-1]] [--w_unw [0-1]] [--w_coh [0-1]] [--w_con [0-1]] [--w_hgt [0-1]] [--refx [0-1]] [--refy [0-1]]
 """
+
+#%% Change log
+'''
+20240928 ML
+ - check for existence of conn. components, avoiding if not 
+'''
+
 from LiCSBAS_meta import *
 import numpy as np
 import matplotlib.pyplot as plt
@@ -423,6 +430,17 @@ def plot_networks():
     plot_lib.plot_strong_weak_cuts_network(retained_ifgs, bperp, weak_links, edge_cuts, node_cuts, pngfile, plot_weak=True)
 
 
+def check_components_existence():
+    missingcomp = False
+    for ifgd in ifgdates:
+        confile = os.path.join(ccdir, ifgd, ifgd + '.conncomp')
+        if not os.path.exists(confile):
+            missingcomp = True
+            continue
+    if missingcomp:
+        print('At least one ifg has missing conncomp file - not using conncomps')
+        args['ignore_comp']=True
+
 
 def main():
     global retained_ifgs
@@ -432,6 +450,8 @@ def main():
     read_length_width()
     decide_reference_window_size()
     get_ifgdates()
+    if not args.ignore_comp:
+        check_components_existence()
 
     calc_block_sum_of_unw_coh_component_size()
     calc_height_std()

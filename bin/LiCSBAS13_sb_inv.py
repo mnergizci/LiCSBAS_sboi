@@ -818,7 +818,7 @@ def main(argv=None):
                 gap_patch = np.zeros((n_im-1, n_pt_all), dtype=np.int8)
                 ns_ifg_noloop_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
                 maxTlen_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
-                print('\n  Identifing gaps, and counting n_gap and n_ifg_noloop,')
+                print('\n  Identifying gaps, and counting n_gap and n_ifg_noloop,')
 
                 if gpu:
                     print('  using GPU...', flush=True)
@@ -992,7 +992,10 @@ def main(argv=None):
                 file = os.path.join(resultsdir, names[i])
                 with open(file, openmode) as f:
                     data[i].tofile(f)
-
+            # storing also the gap_patch matrix to be used later
+            file = os.path.join(resultsdir, 'gap_patch')
+            with open(file, openmode) as f:
+                gap_patch[i].tofile(f)
 
         #%% Finish patch
         elapsed_time2 = int(time.time()-start2)
@@ -1149,7 +1152,6 @@ def count_gaps_wrapper(i):
 
     ### n_gap and gap location
 #    ns_unw_unnan4inc = (np.matmul(np.int8(G[:, :, None]), (~np.isnan(unwpatch.T))[:, None, :])).sum(axis=0, dtype=np.int16) #n_ifg, n_im-1, n_pt -> n_im-1, n_pt
-    print('')
     print('patch '+str(i)+', step 1/3: gaps identification')
     ns_unw_unnan4inc = np.array([(G[:, j]*
                           (~np.isnan(unwpatch[i*n_pt_patch:(i+1)*n_pt_patch])))
@@ -1179,7 +1181,7 @@ def count_gaps_wrapper(i):
             (~np.isnan(unwpatch[i*n_pt_patch:(i+1)*n_pt_patch, j]))
             ).sum(axis=0) for j in range(n_ifg)]) #
     del bool_loop
-    
+
     print('patch ' + str(i) + ': indices calculated')
     ns_ifg_noloop_tmp = (ns_loop4ifg==0).sum(axis=0) #n_pt
     del ns_loop4ifg
