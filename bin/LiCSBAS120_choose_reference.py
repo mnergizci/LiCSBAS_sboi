@@ -436,7 +436,7 @@ def check_components_existence():
         confile = os.path.join(ccdir, ifgd, ifgd + '.conncomp')
         if not os.path.exists(confile):
             missingcomp = True
-            continue
+            break
     if missingcomp:
         print('At least one ifg has missing conncomp file - not using conncomps')
         args['ignore_comp']=True
