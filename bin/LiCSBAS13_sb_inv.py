@@ -1141,7 +1141,7 @@ def main(argv=None):
 
 #%%
 def count_gaps_wrapper(i):
-    print("    Running {:2}/{:2}th patch...".format(i+1, n_para_gap), flush=True)
+    print("    Running {:2}/{:2}th sub-patch...".format(i+1, n_para_gap), flush=True)
     n_pt_patch = int(np.ceil(unwpatch.shape[0]/n_para_gap))
     n_im = G.shape[1]+1
     n_loop, n_ifg = Aloop.shape

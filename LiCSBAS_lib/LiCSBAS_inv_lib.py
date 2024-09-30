@@ -8,6 +8,8 @@ Python3 library of time series inversion functions for LiCSBAS.
 =========
 Changelog
 =========
+20240930 ML
+ - (finally) found the bug causing nans in inversion of some datasets. Fixed by removing the scipy.sparse functionality. Perhaps just csr_array would do or other tweaking?
 20240423 ML
  - parallelised singular (with correct vel/vconst estimates)
 20231101 Yasser Maghsoudi (and ML), Uni Leeds
@@ -42,8 +44,8 @@ import multiprocessing as multi
 from astropy.stats import bootstrap
 from astropy.utils import NumpyRNGContext
 #from scipy.sparse.linalg import lsqr as sparselsq
-from scipy.sparse.linalg import lsmr as sparselsq
-from scipy.sparse import csr_array, csc_array  # csr_matrix, csc_matrix # but maybe coo_matrix would be better for G? to be checked
+#from scipy.sparse.linalg import lsmr as sparselsq
+#from scipy.sparse import csr_array, csc_array  # csr_matrix, csc_matrix # but maybe coo_matrix would be better for G? to be checked
 import LiCSBAS_tools_lib as tools_lib
 try:
     from sklearn.linear_model import RANSACRegressor
@@ -51,8 +53,8 @@ except:
     print('not loading RANSAC (optional experimental function)')
 
 
-debugmode = True
-print('inversion runs in debug mode - please inform Milan if this works now')
+#debugmode = True
+#print('inversion runs in debug mode - please inform Milan if this works now')
 
 #%%
 def make_sb_matrix(ifgdates):
@@ -200,10 +202,10 @@ def invert_nsbas(unw, G, dt_cum, gamma, n_core, gpu, singular=False, only_sb=Fal
             q = multi.get_context('fork')
             p = q.Pool(n_core)
             if not singular:
-                if debugmode:
-                    A = Gall
-                else:
-                    A = csc_array(Gall)  # or csr?
+                #if debugmode:
+                #A = Gall
+                #else:
+                #    A = csc_array(Gall)  # or csr?
                 _result = p.map(censored_lstsq_slow_para_wrapper, args) #list[n_pt][length]
             else:
                 from functools import partial
@@ -308,6 +310,13 @@ def censored_lstsq_slow_para_wrapper(i):
     if np.mod(i, 100) == 0:
         print('  Running {0:6}/{1:6}th point...'.format(i, unw_tmp.shape[1]), flush=True)
     m = mask[:,i] # drop rows where mask is zero
+    X = np.linalg.lstsq(Gall[m], unw_tmp[m, i], rcond=None)[0]
+    return X
+
+'''
+2024-09-30 - a BUG! the sparselsq ended up on values with e-5 where lstsq return correct values(!)
+reverting back to numpy solution
+
     try:
         #X = np.linalg.lstsq(Gall[m], unw_tmp[m,i], rcond=None)[0]
         X = sparselsq(A[m], unw_tmp[m, i], atol=1e-05, btol=1e-05)[0]
@@ -316,7 +325,7 @@ def censored_lstsq_slow_para_wrapper(i):
         print('Warning: error during sparselsq - setting to nan')
         print('')
     return X
-
+'''
 
 #%%
 def invert_nsbas_wls(unw, var, G, dt_cum, gamma, n_core):
@@ -742,14 +751,19 @@ def censored_lstsq_slow(A, B, M):
     X = np.empty((A.shape[1], B.shape[1]))
     # 20231101 update - not tested
     #A = csr_matrix(A) # or csc?
-    if not debugmode:
-        A = csc_array(A) # or csr?
+    #if not debugmode:
+    #    A = csc_array(A) # or csr?
     errs = 0
     for i in range(B.shape[1]):
         if np.mod(i, 100) == 0:
              print('\r  Running {0:6}/{1:6}th point...'.format(i, B.shape[1]), end='', flush=True)
 
         m = M[:,i] # drop rows where mask is zero
+        X[:, i] = np.linalg.lstsq(A[m], B[m, i], rcond=None)[0]
+    return X
+
+'''
+# 20240930 - removing the sparselsq - it just does NOT do any good job! 
         try:
             #X[:,i] = np.linalg.lstsq(A[m], B[m,i], rcond=None)[0]
             # 20231101 update
@@ -762,3 +776,4 @@ def censored_lstsq_slow(A, B, M):
         print('Warning: '+str(errs)+' errors occurred during sparselsq (-> nan increments)')
         print('')
     return X
+'''
