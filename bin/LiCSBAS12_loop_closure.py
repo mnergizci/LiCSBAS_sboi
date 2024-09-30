@@ -1285,7 +1285,9 @@ def loop_closure_4th(args, da):
     #plot_lib.make_im_png(loop_ph_wrapped_sum_abs/n_loop, file + '.png', cmap_noise_r, title)
     plot_lib.make_im_png(loop_ph_avg_abs, file + '.png', cmap_noise_r, title)
 
-    del nonan_count, loop_ph_wrapped_sum_abs, loop_ph_wrapped_sum
+    del nonan_count
+    del loop_ph_wrapped_sum_abs
+    del loop_ph_wrapped_sum
 
     #
     # Lin Shen update ---- WARNING / TODO: 
