@@ -439,7 +439,7 @@ def check_components_existence():
             break
     if missingcomp:
         print('At least one ifg has missing conncomp file - not using conncomps')
-        args['ignore_comp']=True
+        args.ignore_comp=True
 
 
 def main():
