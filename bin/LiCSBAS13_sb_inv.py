@@ -153,6 +153,7 @@ import os
 import sys
 import re
 import time
+import traceback
 import psutil
 import h5py as h5
 import numpy as np
@@ -745,34 +746,42 @@ def main(argv=None):
 
                 if not nullify_noloops_use_data_after_nullification:
                     print('(from data before loop phase closure error nullification if done in step 12)')
-                    try:
-                        # step 2 for nullify_noloops: load the unw files
-                        for i, ifgd in enumerate(ifgdates):
-                            unwfile_ori = os.path.join(ifgdir, ifgd, ifgd + '.unw.ori')
-                            if not os.path.exists(unwfile_ori):
-                                # only fixed unw data would keep the originals (ori)
-                                unwfile_ori = os.path.join(ifgdir, ifgd, ifgd + '.unw')
-                            f = open(unwfile_ori, 'rb')
-                            f.seek(countf * 4, os.SEEK_SET)  # Seek for >=2nd patch, 4 means byte
-                            unw_ori = np.fromfile(f, dtype=np.float32, count=countl).reshape((lengththis, width))  #* coef_r2m
-                            unw_ori[unw_ori == 0] = np.nan  # Fill 0 with nan
-                            #unw_ori[~np.isnan(unw_ori)] = 1 # fill everything else with 1
-                            ## unw_ori = unw_ori - ref_unw_ori[i]   # no need for the check here
-                            unwpatch_ori[i] = unw_ori #.astype(np.int8)  # but then we lose the nans again, so will need to change the last function.. maybe later
-                            f.close()
-                        unwpatch_ori = unwpatch_ori.reshape((n_ifg, n_pt_all)).transpose()
-                    except:
-                        print("Some error loading unw data, skipping the nullify_noloops routine", flush=True)
-                        nullify_noloops = False
+                    reload_oris = False
+                    for i, ifgd in enumerate(ifgdates):
+                        unwfile_ori = os.path.join(ifgdir, ifgd, ifgd + '.unw.ori')
+                        if os.path.exists(unwfile_ori):
+                            reload_oris = True
+                    if reload_oris:
+                        try:
+                            print('Loading all unw data before the step 12 nullification to memory')
+                            # step 2 for nullify_noloops: load the unw files
+                            for i, ifgd in enumerate(ifgdates):
+                                unwfile_ori = os.path.join(ifgdir, ifgd, ifgd + '.unw.ori')
+                                if not os.path.exists(unwfile_ori):
+                                    # only fixed unw data would keep the originals (ori)
+                                    unwfile_ori = os.path.join(ifgdir, ifgd, ifgd + '.unw')
+                                f = open(unwfile_ori, 'rb')
+                                f.seek(countf * 4, os.SEEK_SET)  # Seek for >=2nd patch, 4 means byte
+                                unw_ori = np.fromfile(f, dtype=np.float32, count=countl).reshape((lengththis, width))  #* coef_r2m
+                                unw_ori[unw_ori == 0] = np.nan  # Fill 0 with nan
+                                #unw_ori[~np.isnan(unw_ori)] = 1 # fill everything else with 1
+                                ## unw_ori = unw_ori - ref_unw_ori[i]   # no need for the check here
+                                unwpatch_ori[i] = unw_ori #.astype(np.int8)  # but then we lose the nans again, so will need to change the last function.. maybe later
+                                f.close()
+                            unwpatch_ori = unwpatch_ori.reshape((n_ifg, n_pt_all)).transpose()
+                        except:
+                            print("Some error loading unw data, skipping the nullify_noloops routine", flush=True)
+                            nullify_noloops = False
+                    else:
+                        unwpatch_ori = unwpatch / coef_r2m
                 else:
                     print('(from data after loop phase closure error nullification if done in step 12)')
+                    # in such case we will just use the unwpatch.. in radians
+                    unwpatch_ori = unwpatch/coef_r2m
 
             # if still ok, perform the main noloop routine
             #n_para_gap = n_para
             if nullify_noloops:
-                if nullify_noloops_use_data_after_nullification:
-                    # in such case we will just use the unwpatch
-                    unwpatch_ori = unwpatch
                 # step 2 for nullify_noloops: counting the noloops and nullying data from ifgs not forming any loop
                 try:
                     print('  with {} parallel processing...'.format(n_para), flush=True)
@@ -788,8 +797,9 @@ def main(argv=None):
                     del _result
                     # why this line below?????? doesn't make sense!
                     #unwpatch = unwpatch / n_para_gap
-                except:
+                except Exception as e:
                     print("Warning: Some error nullifying noloops data", flush=True)
+                    print(traceback.format_exc())
                     nullify_noloops = False
                 del unwpatch_ori # no need anymore
 
