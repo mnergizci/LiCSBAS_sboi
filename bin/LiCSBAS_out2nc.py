@@ -22,6 +22,7 @@ LiCSBAS_out2nc.py [-i infile] [-o outfile] [-m yyyymmdd]
  --compress, -C  use zlib compression (very small files but time series may take long to load in GIS)
  --postfilter will interpolate VEL only through empty areas and filter in space
  --apply_mask  Will apply mask to all relevant variables
+ --extracol Will add extra layer from files in folder TS*/results - e.g. --extracol loop_ph_avg_abs
  
 """
 #%% Change log
@@ -84,7 +85,7 @@ def interp_and_smooth(da, sigma=0.8):
     return dar
 
 
-def loadall2cube(cumfile):
+def loadall2cube(cumfile, extracols=['loop_ph_avg_abs']):
     cumdir = os.path.dirname(cumfile)
     cohfile = os.path.join(cumdir,'results/coh_avg')
     rmsfile = os.path.join(cumdir,'results/resid_rms')
@@ -98,8 +99,8 @@ def loadall2cube(cumfile):
     sizex = len(cum.vel[0])
     sizey = len(cum.vel)
     
-    lon = cum.corner_lon.values+cum.post_lon.values*np.arange(sizex) #-0.5*float(cum.post_lon)
-    lat = cum.corner_lat.values+cum.post_lat.values*np.arange(sizey) #+0.5*float(cum.post_lat)  # maybe needed?
+    lon = cum.corner_lon.values+cum.post_lon.values*np.arange(sizex)-0.5*float(cum.post_lon)
+    lat = cum.corner_lat.values+cum.post_lat.values*np.arange(sizey)+0.5*float(cum.post_lat)  # maybe needed? yes! for gridline/AREA that is default in rasterio...
     
     time = np.array(([dt.datetime.strptime(str(imd), '%Y%m%d') for imd in cum.imdates.values]))
     
@@ -148,6 +149,18 @@ def loadall2cube(cumfile):
         rmsxr.attrs['unit'] = 'mm'
         cube['rms'] = rmsxr
     else: print('No RMS file detected, skipping')
+    try:
+        for e in extracols:
+            efile=os.path.join(cumdir,'results',e)
+            if os.path.exists(efile):
+                infile = np.fromfile(efile, 'float32')   # should be always float. but we can check with os.stat('loop_ph_avg_abs').st_size
+                exr = xr.DataArray(infile.reshape(sizey, sizex), coords=[lat, lon], dims=["lat", "lon"])
+                #rmsxr.attrs['unit'] = 'mm'
+                cube[e] = exr
+            else:
+                print('No '+e+' file detected, skipping')
+    except:
+        print('debug - extra layers not included')
     if os.path.exists(vstdfile):
         infile = np.fromfile(vstdfile, 'float32')
         vstdxr = xr.DataArray(infile.reshape(sizey,sizex), coords=[lat, lon], dims=["lat", "lon"])
@@ -212,17 +225,18 @@ def main(argv=None):
     imd_m = []
     #refarea = []
     refarea_geo = []
-    maskfile = []
+    #maskfile = []
     apply_mask = False
     cliparea_geo = []
     compress = False
     postfilter = False
     centre_refx, centre_refy = np.nan, np.nan
-    
+    extracols = ['loop_ph_avg_abs']
+
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hi:o:m:r:C", ["help", "compress","postfilter","clip_geo=", "ref_geo=", "apply_mask", "mask="])
+            opts, args = getopt.getopt(argv[1:], "hi:o:m:r:C", ["help", "extracol=", "compress","postfilter","clip_geo=", "ref_geo=", "apply_mask", "mask="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -233,6 +247,8 @@ def main(argv=None):
                 cumfile = a
             elif o == '-o':
                 outfile = a
+            elif o == '--extracol':
+                extracols.append(a)
             elif o == '-m':
                 imd_m = a
             elif (o == '-C') or (o=='--compress'):
@@ -253,8 +269,8 @@ def main(argv=None):
                 minrefx, maxrefx, minrefy, maxrefy = refarea_geo.split('/')
                 minrefx, maxrefx, minrefy, maxrefy = float(minrefx), float(maxrefx), float(minrefy), float(maxrefy)
                 centre_refx, centre_refy = (minrefx+maxrefx)/2, (minrefy+maxrefy)/2
-            elif o == '--mask':
-                maskfile = a
+            #elif o == '--mask':
+            #    maskfile = a
             elif o == '--apply_mask':
                 apply_mask = True
 
@@ -266,9 +282,8 @@ def main(argv=None):
         print("  "+str(err.msg), file=sys.stderr)
         print("\nFor help, use -h or --help.\n", file=sys.stderr)
         return 2
-    
-    
-    cube = loadall2cube(cumfile)
+
+    cube = loadall2cube(cumfile, extracols = extracols)
     
     if apply_mask:
         davars = list(cube.data_vars)

@@ -360,9 +360,10 @@ def main(argv=None):
             rasorg = os.path.join(ifgdir, ifgdates[i], rasname)
 
             if not os.path.exists(rasorg):
-                print('\nERROR: No browse image {} available!\n'
-                      .format(rasorg), file=sys.stderr)
-                return 2
+                print('WARNING: No browse image {} available!\n'.format(rasorg))
+                print('assuming there is an error and skipping this ifg')
+                bad_ifgdates.append(ifgdates[i])
+                continue
 
         ### Identify bad ifgs and link ras
         if rate_cov[i] < unw_cov_thre or coh_avg_ifg[i] < coh_thre or \
